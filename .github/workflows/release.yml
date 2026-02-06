@@ -136,15 +136,19 @@ jobs:
       matrix:
         platform: [
           {
-            os: ubuntu-latest,
+            os: ubuntu-22.04,
             target: linux-x86_64
           },
           {
-            os: macos-13,
+            os: ubuntu-22.04-arm,
+            target: linux-arm64
+          },
+          {
+            os: macos-14,
             target: darwin64-x86_64
           },
           {
-            os: macos-latest,
+            os: macos-14,
             target: darwin64-arm64
           },
           {
