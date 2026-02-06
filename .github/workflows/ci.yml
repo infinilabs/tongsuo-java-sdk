@@ -31,7 +31,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, macos-13, macos-14, windows-latest]
+        # https://github.com/actions/runner-images
+        platform: [ubuntu-22.04, ubuntu-22.04-arm, macos-14, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
