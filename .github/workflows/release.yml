@@ -45,7 +45,7 @@ jobs:
           },
           {
             os: ubuntu-22.04-arm,
-            target: linux-arm64
+            target: linux-aarch64
           },
           {
             os: macos-14,
@@ -58,6 +58,10 @@ jobs:
           {
             os: windows-latest,
             target: VC-WIN64A
+          },
+          {
+            os: windows-latest,
+            target: VC-WIN64-ARM
           }
         ]
     runs-on: ${{ matrix.platform.os }}
@@ -141,7 +145,7 @@ jobs:
           },
           {
             os: ubuntu-24.04-arm,
-            target: linux-arm64
+            target: linux-aarch64
           },
           {
             os: macos-14,
@@ -154,6 +158,10 @@ jobs:
           {
             os: windows-latest,
             target: VC-WIN64A
+          },
+          {
+            os: windows-latest,
+            target: VC-WIN64-ARM
           }
         ]
     runs-on: ${{ matrix.platform.os }}
