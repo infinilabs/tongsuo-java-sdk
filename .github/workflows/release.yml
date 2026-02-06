@@ -86,7 +86,7 @@ jobs:
         run: |
           pushd ${{ github.workspace }}/Tongsuo
           perl ./config --banner=Configured ${{ matrix.platform.target }} --prefix=$TONGSUO_HOME --libdir=$TONGSUO_HOME/lib enable-weak-ssl-ciphers enable-ntls no-shared \
-                --strict-warnings --release -Wp,-D_FORTIFY_SOURCE=2 -fstack-protector-strong
+                --strict-warnings --release -fstack-protector-strong 
           make -s -j4
           make install
           popd
