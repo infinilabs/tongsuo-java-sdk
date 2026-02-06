@@ -115,6 +115,9 @@ jobs:
         shell: bash
         run: |
           ./gradlew assemble -PcheckErrorQueue
+          # check the generated jar file
+          ls openjdk/build/libs/tongsuo-*.jar
+          find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
 
       - name: Test with Gradle
         shell: bash
@@ -247,6 +250,9 @@ jobs:
         shell: bash
         run: |
           ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1
+          # check the generated jar file
+          ls openjdk/build/libs/tongsuo-*.jar
+          find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
 
       - name: Test with Gradle on Windows or macOS
         if: runner.os == 'Windows' || runner.os == 'macOS'
