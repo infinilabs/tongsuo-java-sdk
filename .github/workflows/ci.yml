@@ -57,7 +57,7 @@ jobs:
           - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64,    name: macOS-ARM64 }
           - { os: windows-latest,   target: VC-WIN64A,         name: Windows-x64 }
-          - { os: ubuntu-24.04,     target: VC-WIN64-ARM,      name: Windows-ARM64, cross_compile: true }
+          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64, arch: arm64 }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 30
     
@@ -125,35 +125,6 @@ jobs:
             softwareupdate --install-rosetta --agree-to-license
           fi
           echo "Rosetta 2 is available"
-
-      - name: Set up llvm-mingw for Windows ARM64 cross-compilation
-        if: matrix.platform.cross_compile == true && matrix.platform.target == 'VC-WIN64-ARM'
-        shell: bash
-        run: |
-          echo "Installing llvm-mingw toolchain for ARM64..."
-          
-          # Download and install llvm-mingw (supports ARM64)
-          LLVM_MINGW_VERSION="20231128"
-          LLVM_MINGW_URL="https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-20.04-x86_64.tar.xz"
-          
-          wget -q "${LLVM_MINGW_URL}" -O /tmp/llvm-mingw.tar.xz
-          sudo mkdir -p /opt/llvm-mingw
-          sudo tar -xf /tmp/llvm-mingw.tar.xz -C /opt/llvm-mingw --strip-components=1
-          rm /tmp/llvm-mingw.tar.xz
-          
-          # Add to PATH
-          echo "/opt/llvm-mingw/bin" >> $GITHUB_PATH
-          export PATH="/opt/llvm-mingw/bin:$PATH"
-          
-          # Set environment variables for cross-compilation
-          echo "CC=aarch64-w64-mingw32-clang" >> $GITHUB_ENV
-          echo "CXX=aarch64-w64-mingw32-clang++" >> $GITHUB_ENV
-          echo "AR=aarch64-w64-mingw32-ar" >> $GITHUB_ENV
-          echo "RANLIB=aarch64-w64-mingw32-ranlib" >> $GITHUB_ENV
-          
-          # Verify installation
-          aarch64-w64-mingw32-clang --version
-          echo "llvm-mingw ARM64 toolchain installed successfully"
 
       - name: Set up Rosetta (x86_64 for macOS x64)
         if: runner.os == 'macOS' && matrix.platform.use_qemu == true
@@ -225,20 +196,7 @@ jobs:
           # Determine configuration target
           CONFIG_TARGET="${{ matrix.platform.target }}"
           CONFIG_ARGS=""
-          
-          # For Windows ARM64 cross-compilation on Linux, use mingw64
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
-            export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
-            # Clear CC to prevent double-prefix (Configure will add prefix automatically)
-            unset CC CXX AR RANLIB
-            # Remove --strict-warnings to avoid -Werror issues with clang
-            STRICT_WARNINGS=""
-            echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
-          else
-            STRICT_WARNINGS="--strict-warnings"
-          fi
+          STRICT_WARNINGS="--strict-warnings"
           
           echo "Configuring ${CONFIG_TARGET}..."
           ./Configure ${CONFIG_TARGET} \
@@ -249,32 +207,10 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          # For Windows ARM64, build libs first (apps will fail due to resource file issue, but libs are OK)
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            # Build only crypto and ssl libraries, not programs
-            # First generate all headers, then build libraries (avoid parallel build race)
-            make build_generated
-            make -j4 libcrypto.a libssl.a
-            # Check if libraries were built successfully
-            if [[ -f libcrypto.a && -f libssl.a ]]; then
-              echo "✅ Libraries built successfully"
-              # Manually install just the libraries
-              echo "Installing libraries..."
-              mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include
-              cp -r include/openssl $TONGSUO_HOME/include/
-              cp libcrypto.a $TONGSUO_HOME/lib/
-              cp libssl.a $TONGSUO_HOME/lib/
-              echo "Windows ARM64 static libraries installed successfully"
-              ls -lh $TONGSUO_HOME/lib/
-            else
-              echo "❌ Library build failed"
-              exit 1
-            fi
-          else
-            make -s -j4
-            echo "Installing..."
-            make install
-          fi
+          make -s -j4
+          
+          echo "Installing..."
+          make install
 
       # -----------------------------------------------------------
       # Build Tongsuo C Lib (Windows)
@@ -282,7 +218,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
         with:
-          arch: ${{ matrix.platform.target == 'VC-WIN64-ARM' && 'amd64_arm64' || 'amd64' }}
+          arch: ${{ matrix.platform.arch == 'arm64' && 'amd64_arm64' || 'amd64' }}
           
       - uses: ilammy/setup-nasm@v1
         if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64A'
@@ -296,11 +232,20 @@ jobs:
         run: |
           cd ${{ github.workspace }}\Tongsuo
           
-          Write-Host "Configuring ${{ matrix.platform.target }}..."
+          # Set configuration args
+          $configArgs = ""
+          if ("${{ matrix.platform.arch }}" -eq "arm64") {
+            $configArgs = "no-asm"
+            Write-Host "Configuring ${{ matrix.platform.target }} for ARM64 cross-compilation..."
+          } else {
+            Write-Host "Configuring ${{ matrix.platform.target }}..."
+          }
+          
           perl .\Configure ${{ matrix.platform.target }} `
             --prefix=$Env:TONGSUO_HOME `
             no-capieng no-makedepend `
-            enable-weak-ssl-ciphers enable-ntls no-shared --release
+            enable-weak-ssl-ciphers enable-ntls no-shared --release `
+            $configArgs
           
           Write-Host "Building..."
           nmake /S
@@ -334,11 +279,10 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
-        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
+          TASK="check"
           GRADLE_CMD="./gradlew"
           
           # For macOS x86_64 on ARM, use Rosetta 2 to run x86_64 JDK
@@ -348,28 +292,35 @@ jobs:
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           
+          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
+          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
+            TASK="assemble"
+            echo "⚠️  Windows ARM64: Building only (tests require ARM64 hardware)"
+          fi
+          
           # For macOS ARM64, let it build natively (no special flags needed)
           # The JDK and toolchain will be ARM64 by default on macos-14
 
-          # Add arch parameter for Windows ARM64
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
-          fi
-          
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert Unix-style path to Windows-style for Gradle
-            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            if command -v cygpath >/dev/null 2>&1; then
+              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+            else
+              # Fallback: convert /d/path to D:\path, and normalize slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+            fi
+            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
           
-          echo "Running Gradle check with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
+          echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build
-        if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
         shell: bash
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -446,7 +397,7 @@ jobs:
           - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64,    name: macOS-ARM64 }
           - { os: windows-latest,   target: VC-WIN64A,         name: Windows-x64 }
-          - { os: ubuntu-24.04,     target: VC-WIN64-ARM,      name: Windows-ARM64, cross_compile: true }
+          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64, arch: arm64 }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 30
     
@@ -515,29 +466,6 @@ jobs:
           fi
           echo "Rosetta 2 is available"
 
-      - name: Set up llvm-mingw for Windows ARM64 cross-compilation
-        if: matrix.platform.cross_compile == true && matrix.platform.target == 'VC-WIN64-ARM'
-        shell: bash
-        run: |
-          echo "Installing llvm-mingw toolchain for ARM64..."
-          
-          # Download and install llvm-mingw (supports ARM64)
-          LLVM_MINGW_VERSION="20231128"
-          LLVM_MINGW_URL="https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-20.04-x86_64.tar.xz"
-          
-          wget -q "${LLVM_MINGW_URL}" -O /tmp/llvm-mingw.tar.xz
-          sudo mkdir -p /opt/llvm-mingw
-          sudo tar -xf /tmp/llvm-mingw.tar.xz -C /opt/llvm-mingw --strip-components=1
-          rm /tmp/llvm-mingw.tar.xz
-          
-          # Add to PATH (Configure will use --cross-compile-prefix)
-          echo "/opt/llvm-mingw/bin" >> $GITHUB_PATH
-          export PATH="/opt/llvm-mingw/bin:$PATH"
-          
-          # Verify installation
-          aarch64-w64-mingw32-clang --version
-          echo "llvm-mingw ARM64 toolchain installed successfully"
-
       - name: Set up JDK 11 (x86_64 for macOS x64)
         if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
         uses: actions/setup-java@v5
@@ -596,21 +524,7 @@ jobs:
           # Determine configuration target
           CONFIG_TARGET="${{ matrix.platform.target }}"
           CONFIG_ARGS=""
-          
-          # For Windows ARM64 cross-compilation on Linux, use mingw64
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            CONFIG_TARGET="mingw64"
-            # Use no-shared for ARM64 to avoid DLL resource file issues
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm no-shared"
-            export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
-            # Clear CC to prevent double-prefix (Configure will add prefix automatically)
-            unset CC CXX AR RANLIB
-            # Remove --strict-warnings to avoid -Werror issues with clang
-            STRICT_WARNINGS=""
-            echo "Using mingw64 configuration for Windows ARM64 cross-compilation (static libs only)"
-          else
-            STRICT_WARNINGS="--strict-warnings"
-          fi
+          STRICT_WARNINGS="--strict-warnings"
           
           echo "Configuring ${CONFIG_TARGET} (dynamic)..."
           ./Configure ${CONFIG_TARGET} \
@@ -621,32 +535,10 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          # For Windows ARM64, use static libs (DLL has resource file issues)
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            # Build only crypto and ssl libraries, not programs
-            # First generate all headers, then build libraries (avoid parallel build race)
-            make build_generated
-            make -j4 libcrypto.a libssl.a
-            # Check if libraries were built successfully
-            if [[ -f libcrypto.a && -f libssl.a ]]; then
-              echo "✅ Libraries built successfully"
-              # Manually install just the libraries
-              echo "Installing libraries..."
-              mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include
-              cp -r include/openssl $TONGSUO_HOME/include/
-              cp libcrypto.a $TONGSUO_HOME/lib/
-              cp libssl.a $TONGSUO_HOME/lib/
-              echo "Windows ARM64 static libraries installed successfully"
-              ls -lh $TONGSUO_HOME/lib/
-            else
-              echo "❌ Library build failed"
-              exit 1
-            fi
-          else
-            make -s -j4
-            echo "Installing..."
-            make install
-          fi
+          make -s -j4
+          
+          echo "Installing..."
+          make install
 
       # -----------------------------------------------------------
       # Build Tongsuo C Lib (Windows Dynamic)
@@ -654,7 +546,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
         with:
-          arch: ${{ matrix.platform.target == 'VC-WIN64-ARM' && 'amd64_arm64' || 'amd64' }}
+          arch: ${{ matrix.platform.arch == 'arm64' && 'amd64_arm64' || 'amd64' }}
           
       - uses: ilammy/setup-nasm@v1
         if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64A'
@@ -668,11 +560,20 @@ jobs:
         run: |
           cd ${{ github.workspace }}\Tongsuo
           
-          Write-Host "Configuring ${{ matrix.platform.target }} (dynamic)..."
+          # Set configuration args
+          $configArgs = ""
+          if ("${{ matrix.platform.arch }}" -eq "arm64") {
+            $configArgs = "no-asm"
+            Write-Host "Configuring ${{ matrix.platform.target }} (dynamic, ARM64 cross-compilation)..."
+          } else {
+            Write-Host "Configuring ${{ matrix.platform.target }} (dynamic)..."
+          }
+          
           perl .\Configure ${{ matrix.platform.target }} `
             --prefix=$Env:TONGSUO_HOME `
             no-capieng no-makedepend `
-            enable-weak-ssl-ciphers enable-ntls --release
+            enable-weak-ssl-ciphers enable-ntls --release `
+            $configArgs
           
           Write-Host "Building..."
           nmake /S
@@ -713,8 +614,6 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
-        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -730,14 +629,26 @@ jobs:
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           
+          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
+          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
+            TASK="assemble"
+            echo "⚠️  Windows ARM64: Building only (tests require ARM64 hardware)"
+          fi
+          
           # For macOS ARM64, let it build natively (no special flags needed)
           # The JDK and toolchain will be ARM64 by default on macos-14
           
           # Windows Path
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert Unix-style path to Windows-style for Gradle
-            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            if command -v cygpath >/dev/null 2>&1; then
+              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+            else
+              # Fallback: convert /d/path to D:\path, and normalize slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+            fi
+            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
@@ -746,11 +657,11 @@ jobs:
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build (Dynamic)
-        if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
         shell: bash
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "⚠️  Windows ARM64 Build Status (Dynamic, Cross-compiled)"
+          echo "⚠️  Windows ARM64 Build Status (Dynamic)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
           
