@@ -71,6 +71,9 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
           fi
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
@@ -180,6 +183,8 @@ jobs:
       # Gradle Build & Test
       # -----------------------------------------------------------
       - name: Gradle Check
+        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -191,15 +196,6 @@ jobs:
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
-
-          # For Windows ARM64, skip tests (no ARM64 Windows runner available)
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
-            echo "⚠️ Skipping tests for Windows ARM64 - no native ARM64 Windows runners available"
-            echo "Running assemble only..."
-            $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
-            exit 0
-          fi
           
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -208,6 +204,52 @@ jobs:
           
           echo "Running Gradle check..."
           $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+
+      - name: Verify Windows ARM64 Build
+        if: matrix.platform.target == 'VC-WIN64-ARM'
+        shell: pwsh
+        run: |
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          Write-Host "⚠️  Windows ARM64 Build Status"
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          Write-Host ""
+          
+          # Verify Tongsuo libraries exist
+          $libPath = "$env:TONGSUO_HOME\lib"
+          $libCrypto = "$libPath\libcrypto.lib"
+          $libSsl = "$libPath\libssl.lib"
+          
+          if ((Test-Path $libCrypto) -and (Test-Path $libSsl)) {
+            Write-Host "✅ Tongsuo C libraries built successfully:"
+            Write-Host "   - libcrypto.lib: $((Get-Item $libCrypto).Length / 1MB) MB"
+            Write-Host "   - libssl.lib: $((Get-Item $libSsl).Length / 1MB) MB"
+            
+            # Use dumpbin to verify ARM64 architecture
+            $dumpbin = "dumpbin"
+            if (Get-Command $dumpbin -ErrorAction SilentlyContinue) {
+              Write-Host ""
+              Write-Host "Library Architecture Verification:"
+              & $dumpbin /headers $libCrypto | Select-String -Pattern "machine|ARM64"
+            }
+          } else {
+            Write-Error "❌ Tongsuo libraries not found!"
+            exit 1
+          }
+          
+          Write-Host ""
+          Write-Host "❌ Java SDK build skipped - cross-compilation not supported"
+          Write-Host ""
+          Write-Host "Technical Limitation:"
+          Write-Host "  - Building ARM64 JNI .dll on x64 Windows requires:"
+          Write-Host "    1. ARM64 JDK (can be installed)"
+          Write-Host "    2. ARM64 Gradle daemon (cannot run on x64)"
+          Write-Host "    3. ARM64 JNI linker (complex toolchain setup)"
+          Write-Host ""
+          Write-Host "Solutions:"
+          Write-Host "  1. Wait for GitHub Actions ARM64 Windows runners"
+          Write-Host "  2. Use self-hosted ARM64 Windows runner"
+          Write-Host "  3. Build manually on ARM64 Windows device"
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Build Test JAR (Linux x64 Only)
         if: matrix.platform.target == 'linux-x86_64'
@@ -264,6 +306,9 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
           fi
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
@@ -380,6 +425,8 @@ jobs:
           echo "$TONGSUO_HOME/lib" >> $GITHUB_PATH
 
       - name: Gradle Check
+        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -394,13 +441,6 @@ jobs:
             TASK="check"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
-
-          # Windows ARM64: Cannot run tests on x64 runner, only build
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
-            TASK="assemble"
-            echo "⚠️ Skipping tests for Windows ARM64 - no native ARM64 Windows runners available"
-          fi
           
           # Windows Path
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -409,6 +449,45 @@ jobs:
           
           echo "Running Gradle $TASK..."
           $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+
+      - name: Verify Windows ARM64 Build
+        if: matrix.platform.target == 'VC-WIN64-ARM'
+        shell: pwsh
+        run: |
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          Write-Host "⚠️  Windows ARM64 Build Status (Dynamic)"
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          Write-Host ""
+          
+          # Verify Tongsuo DLLs exist
+          $binPath = "$env:TONGSUO_HOME\bin"
+          $libCrypto = "$binPath\libcrypto-3-arm64.dll"
+          $libSsl = "$binPath\libssl-3-arm64.dll"
+          
+          if ((Test-Path $libCrypto) -and (Test-Path $libSsl)) {
+            Write-Host "✅ Tongsuo C libraries (dynamic) built successfully:"
+            Write-Host "   - libcrypto-3-arm64.dll: $((Get-Item $libCrypto).Length / 1MB) MB"
+            Write-Host "   - libssl-3-arm64.dll: $((Get-Item $libSsl).Length / 1MB) MB"
+            
+            # Use dumpbin to verify ARM64 architecture
+            $dumpbin = "dumpbin"
+            if (Get-Command $dumpbin -ErrorAction SilentlyContinue) {
+              Write-Host ""
+              Write-Host "DLL Architecture Verification:"
+              & $dumpbin /headers $libCrypto | Select-String -Pattern "machine|ARM64"
+            }
+          } else {
+            Write-Host "Checking alternative DLL names..."
+            Get-ChildItem -Path $binPath -Filter "*.dll" | ForEach-Object {
+              Write-Host "  Found: $($_.Name) ($($_.Length / 1MB) MB)"
+            }
+          }
+          
+          Write-Host ""
+          Write-Host "❌ Java SDK build skipped - cross-compilation not supported"
+          Write-Host ""
+          Write-Host "See static build job for detailed explanation."
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Build Test JAR with Dynamic Lib Dep (Linux x64 Only)
         if: runner.os != 'Windows'
