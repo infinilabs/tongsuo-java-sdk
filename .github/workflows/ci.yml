@@ -570,7 +570,7 @@ jobs:
           
           # Build configure command based on architecture
           if ("${{ matrix.platform.arch }}" -eq "arm64") {
-            Write-Host "Configuring ${{ matrix.platform.target }} (dynamic, ARM64 cross-compilation)..."
+            Write-Host "Configuring ${{ matrix.platform.target }} (ARM64 cross-compilation)..."
             perl .\Configure ${{ matrix.platform.target }} `
               --prefix=$Env:TONGSUO_HOME `
               no-capieng no-makedepend `
@@ -587,8 +587,47 @@ jobs:
           Write-Host "Building..."
           nmake /S
           
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Build failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          
           Write-Host "Installing..."
           nmake install
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Install failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          
+          # Verify library files exist
+          Write-Host "`n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          Write-Host "Verifying Tongsuo installation..."
+          Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if (Test-Path "$Env:TONGSUO_HOME\lib") {
+            Write-Host "✅ lib directory exists"
+            Get-ChildItem "$Env:TONGSUO_HOME\lib" | Format-Table Name, Length
+          } else {
+            Write-Host "❌ lib directory NOT found"
+            exit 1
+          }
+          if (Test-Path "$Env:TONGSUO_HOME\include\openssl") {
+            Write-Host "✅ include directory exists"
+          } else {
+            Write-Host "❌ include directory NOT found"
+            exit 1
+          }
+          
+          # Check for required library files
+          if (-not (Test-Path "$Env:TONGSUO_HOME\lib\libssl.lib")) {
+            Write-Host "❌ libssl.lib NOT found"
+            exit 1
+          }
+          if (-not (Test-Path "$Env:TONGSUO_HOME\lib\libcrypto.lib")) {
+            Write-Host "❌ libcrypto.lib NOT found"
+            exit 1
+          }
+          Write-Host "✅ Required library files found"
 
       # -----------------------------------------------------------
       # Gradle Build & Test (Dynamic)
