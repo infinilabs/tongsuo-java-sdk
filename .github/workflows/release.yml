@@ -314,14 +314,14 @@ jobs:
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            # Convert to Unix-style path with forward slashes (Gradle accepts this on Windows)
             if command -v cygpath >/dev/null 2>&1; then
-              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+              TONGSUO_HOME_GRADLE=$(cygpath -m "$TONGSUO_HOME")
             else
-              # Fallback: convert /d/path to D:\path, and normalize slashes
-              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+              # Fallback: just use as-is and normalize to forward slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|\\|/|g')
             fi
-            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
+            echo "Normalized TONGSUO_HOME for Gradle: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
@@ -356,14 +356,14 @@ jobs:
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            # Convert to Unix-style path with forward slashes (Gradle accepts this on Windows)
             if command -v cygpath >/dev/null 2>&1; then
-              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+              TONGSUO_HOME_GRADLE=$(cygpath -m "$TONGSUO_HOME")
             else
-              # Fallback: convert /d/path to D:\path, and normalize slashes
-              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+              # Fallback: just use as-is and normalize to forward slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|\\|/|g')
             fi
-            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
+            echo "Normalized TONGSUO_HOME for Gradle: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
@@ -730,14 +730,14 @@ jobs:
           # Windows Path
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            # Convert to Unix-style path with forward slashes (Gradle accepts this on Windows)
             if command -v cygpath >/dev/null 2>&1; then
-              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+              TONGSUO_HOME_GRADLE=$(cygpath -m "$TONGSUO_HOME")
             else
-              # Fallback: convert /d/path to D:\path, and normalize slashes
-              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+              # Fallback: just use as-is and normalize to forward slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|\\|/|g')
             fi
-            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
+            echo "Normalized TONGSUO_HOME for Gradle: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
@@ -780,14 +780,14 @@ jobs:
           # Windows Path
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
-            # Convert path to Windows format (handles both Unix-style and mixed formats)
+            # Convert to Unix-style path with forward slashes (Gradle accepts this on Windows)
             if command -v cygpath >/dev/null 2>&1; then
-              TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME")
+              TONGSUO_HOME_GRADLE=$(cygpath -m "$TONGSUO_HOME")
             else
-              # Fallback: convert /d/path to D:\path, and normalize slashes
-              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|^/\([a-zA-Z]\)/|\1:/|; s|/|\\|g')
+              # Fallback: just use as-is and normalize to forward slashes
+              TONGSUO_HOME_GRADLE=$(echo "$TONGSUO_HOME" | sed 's|\\|/|g')
             fi
-            echo "Converted TONGSUO_HOME: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
+            echo "Normalized TONGSUO_HOME for Gradle: $TONGSUO_HOME -> $TONGSUO_HOME_GRADLE"
           else
             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
