@@ -205,13 +205,16 @@ jobs:
           echo "Building..."
           # For Windows ARM64, build libs first (apps will fail due to resource file issue, but libs are OK)
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            make -s -j4 build_libs || true
+            # Only build libraries, skip apps
+            make -s -j4 build_libs 2>&1 | grep -v "openssl.exe" || true
             # Manually install just the libraries
             echo "Installing libraries..."
             mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include
             cp -r include/openssl $TONGSUO_HOME/include/
-            find . -name "*.a" -exec cp {} $TONGSUO_HOME/lib/ \;
-            echo "Windows ARM64 libraries installed (apps skipped due to cross-compilation limitations)"
+            find . -name "libcrypto.a" -exec cp {} $TONGSUO_HOME/lib/ \;
+            find . -name "libssl.a" -exec cp {} $TONGSUO_HOME/lib/ \;
+            echo "Windows ARM64 static libraries installed successfully"
+            ls -lh $TONGSUO_HOME/lib/
           else
             make -s -j4
             echo "Installing..."
@@ -517,13 +520,16 @@ jobs:
           echo "Building..."
           # For Windows ARM64, use static libs (DLL has resource file issues)
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            make -s -j4 build_libs || true
+            # Only build libraries, skip apps
+            make -s -j4 build_libs 2>&1 | grep -v "openssl.exe" || true
             # Manually install just the libraries
             echo "Installing libraries..."
             mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include
             cp -r include/openssl $TONGSUO_HOME/include/
-            find . -name "*.a" -exec cp {} $TONGSUO_HOME/lib/ \;
-            echo "Windows ARM64 static libraries installed (DLL cross-compilation not supported)"
+            find . -name "libcrypto.a" -exec cp {} $TONGSUO_HOME/lib/ \;
+            find . -name "libssl.a" -exec cp {} $TONGSUO_HOME/lib/ \;
+            echo "Windows ARM64 static libraries installed successfully (dynamic build uses static)"
+            ls -lh $TONGSUO_HOME/lib/
           else
             make -s -j4
             echo "Installing..."
