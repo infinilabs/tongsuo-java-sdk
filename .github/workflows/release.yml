@@ -482,13 +482,14 @@ jobs:
           # For Windows ARM64 cross-compilation on Linux, use mingw64
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
+            # Use no-shared for ARM64 to avoid DLL resource file issues
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm no-shared"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
             # Remove --strict-warnings to avoid -Werror issues with clang
             STRICT_WARNINGS=""
-            echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
+            echo "Using mingw64 configuration for Windows ARM64 cross-compilation (static libs only)"
           else
             STRICT_WARNINGS="--strict-warnings"
           fi
@@ -502,16 +503,15 @@ jobs:
             ${CONFIG_ARGS}
           
           echo "Building..."
-          # For Windows ARM64, build libs first (apps will fail due to resource file issue, but libs are OK)
+          # For Windows ARM64, use static libs (DLL has resource file issues)
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             make -s -j4 build_libs || true
             # Manually install just the libraries
             echo "Installing libraries..."
-            mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include $TONGSUO_HOME/bin
+            mkdir -p $TONGSUO_HOME/lib $TONGSUO_HOME/include
             cp -r include/openssl $TONGSUO_HOME/include/
-            find . -name "*.dll" -exec cp {} $TONGSUO_HOME/bin/ \; 2>/dev/null || true
-            find . -name "*.dll.a" -exec cp {} $TONGSUO_HOME/lib/ \; 2>/dev/null || true
-            echo "Windows ARM64 libraries installed (apps skipped due to cross-compilation limitations)"
+            find . -name "*.a" -exec cp {} $TONGSUO_HOME/lib/ \;
+            echo "Windows ARM64 static libraries installed (DLL cross-compilation not supported)"
           else
             make -s -j4
             echo "Installing..."
