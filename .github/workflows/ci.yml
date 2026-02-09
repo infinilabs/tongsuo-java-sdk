@@ -87,7 +87,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
-          
+          chmod +x Configure config
           # Auto-detect target using ./Configure
           ./Configure --prefix=$TONGSUO_HOME --libdir=$TONGSUO_HOME/lib \
             enable-weak-ssl-ciphers enable-ntls no-shared \
@@ -192,7 +192,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
-          
+          chmod +x Configure config
           # Removed no-shared
           ./Configure --prefix=$TONGSUO_HOME --libdir=$TONGSUO_HOME/lib \
             enable-weak-ssl-ciphers enable-ntls \

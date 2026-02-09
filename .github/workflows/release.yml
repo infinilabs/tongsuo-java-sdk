@@ -96,7 +96,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
-          
+          chmod +x Configure config
           echo "Configuring ${{ matrix.platform.target }}..."
           ./Configure ${{ matrix.platform.target }} \
             --prefix=$TONGSUO_HOME \
@@ -236,6 +236,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
+          chmod +x Configure config
           # No 'no-shared'
           ./Configure ${{ matrix.platform.target }} \
             --prefix=$TONGSUO_HOME \
