@@ -222,7 +222,12 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          make -s -j4
+          # For Windows ARM64 cross-compilation, only build libraries (skip apps with resource files)
+          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            make -s -j4 build_libs
+          else
+            make -s -j4
+          fi
           
           echo "Installing..."
           make install
@@ -546,7 +551,12 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          make -s -j4
+          # For Windows ARM64 cross-compilation, only build libraries (skip apps with resource files)
+          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            make -s -j4 build_libs
+          else
+            make -s -j4
+          fi
           
           echo "Installing..."
           make install
