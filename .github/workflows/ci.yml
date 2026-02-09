@@ -122,6 +122,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 11
+          architecture: x64
 
       - uses: actions/checkout@v6
 
@@ -225,6 +226,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
+        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -391,6 +394,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 11
+          architecture: x64
 
       - uses: actions/checkout@v6
 

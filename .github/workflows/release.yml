@@ -114,6 +114,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 11
+          architecture: x64
 
       - uses: actions/checkout@v6
 
@@ -211,6 +212,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -226,6 +229,8 @@ jobs:
           $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -255,6 +260,7 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Static JAR
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
@@ -335,6 +341,7 @@ jobs:
              echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
           fi
+          echo "Rosetta 2 is available"
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
         if: runner.os == 'macOS' && matrix.platform.use_qemu == true
@@ -362,6 +369,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 11
+          architecture: x64
 
       - uses: actions/checkout@v6
 
@@ -467,6 +475,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -488,6 +498,8 @@ jobs:
           $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -516,6 +528,7 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Dynamic JAR
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
