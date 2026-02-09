@@ -12,8 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The version to build (e.g., 8.4.0)'
+        description: 'The version to build (e.g., 1.1.0)'
         required: true
+        default: '1.1.0'
 
 env:
   TONGSUO_VERSION: 8.4-stable
@@ -64,7 +65,7 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Setup cross-compilation flags for macOS x86_64 on ARM runners
+          # Cross-compilation flags for macOS x86_64 on ARM runners
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
@@ -85,9 +86,7 @@ jobs:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
 
-      # -----------------------------------------------------------
-      # Build Tongsuo C Lib (Unix: Linux / macOS)
-      # -----------------------------------------------------------
+      # --- Build C Lib (Unix) ---
       - name: Build Tongsuo C Lib (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -95,26 +94,17 @@ jobs:
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
           
-          echo "Configuring for ${{ matrix.platform.target }}..."
-          # Use ./Configure (capital C) to explicitly set the target
+          echo "Configuring ${{ matrix.platform.target }}..."
           ./Configure ${{ matrix.platform.target }} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
             --strict-warnings --release -fstack-protector-strong \
             enable-weak-ssl-ciphers enable-ntls no-shared > configure.log 2>&1
           
-          echo "Building..."
           make -s -j4 > build.log 2>&1
           make install >> build.log 2>&1
-          
-          echo "Build complete. Checking library architecture:"
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            file $TONGSUO_HOME/lib/libcrypto.a
-          fi
 
-      # -----------------------------------------------------------
-      # Build Tongsuo C Lib (Windows)
-      # -----------------------------------------------------------
+      # --- Build C Lib (Windows) ---
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
       - uses: ilammy/setup-nasm@v1
@@ -131,17 +121,14 @@ jobs:
           nmake /S
           nmake install
 
-      # -----------------------------------------------------------
-      # Build Java SDK with Gradle
-      # -----------------------------------------------------------
+      # --- Build Java SDK ---
       - name: Gradle Assemble
         shell: bash
         run: |
-          # Pass specific architecture prop if building x86_64 on macOS ARM
           GRADLE_ARGS=""
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then GRADLE_ARGS="-Parch=x86_64"; fi
           
-          echo "Building JAR with Gradle..."
+          echo "Building JAR..."
           ./gradlew assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_build.log 2>&1
 
       - name: Gradle Test
@@ -157,9 +144,21 @@ jobs:
           
           ./gradlew test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_test.log 2>&1
 
-      # -----------------------------------------------------------
-      # Error Handling: Upload Logs
-      # -----------------------------------------------------------
+      - name: Rename Static JAR
+        shell: bash
+        run: |
+          cd openjdk/build/libs/
+          SRC_JAR=$(ls tongsuo-openjdk-*.jar | grep -v "sources" | grep -v "javadoc" | head -n 1)
+          
+          if [ -f "$SRC_JAR" ]; then
+             NEW_NAME="tongsuo-openjdk-${{ inputs.version }}-${{ matrix.platform.target }}.jar"
+             echo "Renaming $SRC_JAR -> $NEW_NAME"
+             mv "$SRC_JAR" "$NEW_NAME"
+          else
+             echo "Error: Generated JAR not found!"
+             exit 1
+          fi
+
       - name: Upload Logs on Failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -169,9 +168,12 @@ jobs:
             ${{ github.workspace }}/Tongsuo/*.log
             *.log
 
-      # -----------------------------------------------------------
-      # Release
-      # -----------------------------------------------------------
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-static-${{ matrix.platform.target }}
+          path: openjdk/build/libs/tongsuo-openjdk-${{ inputs.version }}-${{ matrix.platform.target }}.jar
+
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         if: success()
@@ -179,8 +181,7 @@ jobs:
           tag_name: ${{ inputs.version }}
           draft: true
           prerelease: true
-          fail_on_unmatched_files: false
-          files: openjdk/build/libs/tongsuo-openjdk-${{ inputs.version }}*.jar
+          files: openjdk/build/libs/tongsuo-openjdk-${{ inputs.version }}-${{ matrix.platform.target }}.jar
 
   # ==================================================================================
   # Phase 3: Build Dynamic Library
@@ -225,23 +226,19 @@ jobs:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
 
-      # -----------------------------------------------------------
-      # Build Tongsuo C Lib (Unix Dynamic)
-      # -----------------------------------------------------------
+      # --- Build C Lib (Dynamic) ---
       - name: Build Tongsuo C Lib (Unix Dynamic)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           cd ${{ github.workspace }}/Tongsuo
           mkdir -p $TONGSUO_HOME
-          
-          # Note: Removed no-shared to build dynamic libs
+          # No 'no-shared'
           ./Configure ${{ matrix.platform.target }} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
             --strict-warnings --release \
             enable-weak-ssl-ciphers enable-ntls > configure.log 2>&1
-          
           make -s -j4 > build.log 2>&1
           make install >> build.log 2>&1
 
@@ -257,21 +254,18 @@ jobs:
         shell: pwsh
         run: |
           cd ${{ github.workspace }}\Tongsuo
-          # Removed no-shared
           perl .\Configure ${{ matrix.platform.target }} --prefix=$Env:TONGSUO_HOME --release no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls
           nmake /S
           nmake install
 
-      # -----------------------------------------------------------
-      # Gradle Assemble & Test (Dynamic)
-      # -----------------------------------------------------------
+      # --- Build Java SDK ---
       - name: Gradle Assemble & Test
         shell: bash
         run: |
           GRADLE_ARGS=""
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then GRADLE_ARGS="-Parch=x86_64"; fi
           
-          # Set library path for runtime
+          # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
              export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
           elif [[ "${{ runner.os }}" == "macOS" ]]; then
@@ -286,23 +280,21 @@ jobs:
           echo "Running Gradle Test..."
           ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_test.log 2>&1
 
-      # -----------------------------------------------------------
-      # Rename JARs
-      # -----------------------------------------------------------
-      - name: Rename Dynamic JARs
+      - name: Rename Dynamic JAR
         shell: bash
         run: |
           cd openjdk/build/libs/
-          # Exclude javadoc and sources
-          for file in tongsuo-openjdk-${{ inputs.version }}-*.jar; do
-            if [[ -f "$file" ]]; then
-               # Strip prefix to get os-arch.jar
-               suffix=$(echo "$file" | sed "s/tongsuo-openjdk-${{ inputs.version }}-//")
-               new_name="tongsuo-openjdk-dynamic-${{ inputs.version }}-${suffix}"
-               echo "Renaming $file -> $new_name"
-               mv "$file" "$new_name"
-            fi
-          done
+          SRC_JAR=$(ls tongsuo-openjdk-*.jar | grep -v "sources" | grep -v "javadoc" | head -n 1)
+          
+          if [ -f "$SRC_JAR" ]; then
+             # 强制命名格式：tongsuo-openjdk-dynamic-[version]-[target].jar
+             NEW_NAME="tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar"
+             echo "Renaming $SRC_JAR -> $NEW_NAME"
+             mv "$SRC_JAR" "$NEW_NAME"
+          else
+             echo "Error: Generated JAR not found!"
+             exit 1
+          fi
 
       - name: Upload Logs on Failure
         if: failure()
@@ -313,6 +305,12 @@ jobs:
             ${{ github.workspace }}/Tongsuo/*.log
             *.log
 
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-dynamic-${{ matrix.platform.target }}
+          path: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar
+
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         if: success()
@@ -320,5 +318,4 @@ jobs:
           tag_name: ${{ inputs.version }}
           draft: true
           prerelease: true
-          fail_on_unmatched_files: false
-          files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}*.jar
+          files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar

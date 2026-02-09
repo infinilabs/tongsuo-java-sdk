@@ -139,11 +139,10 @@ jobs:
             *.log
 
       - name: Upload Test JAR
-        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: testjar
-          path: openjdk/build/libs/tongsuo-openjdk-*-tests.jar
+          name: jar-static-${{ matrix.os }}
+          path: openjdk/build/libs/tongsuo-openjdk-*.jar
           if-no-files-found: ignore
 
   # ==================================================================================
