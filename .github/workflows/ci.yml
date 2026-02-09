@@ -167,6 +167,11 @@ jobs:
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
             GRADLE_ARGS="-Parch=x86_64"
           fi
+
+          # Add arch parameter for Windows ARM64
+          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            GRADLE_ARGS="-Parch=arm64"
+          fi
           
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -334,7 +339,12 @@ jobs:
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
             GRADLE_ARGS="-Parch=x86_64"
           fi
-          
+
+          # Add arch parameter for Windows ARM64
+          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            GRADLE_ARGS="-Parch=arm64"
+          fi
+
           # Set runtime library paths
           if [[ "${{ runner.os }}" == "Linux" ]]; then
              export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
