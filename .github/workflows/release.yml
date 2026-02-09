@@ -114,18 +114,19 @@ jobs:
       - name: Build with Gradle
         shell: bash
         run: |
-          ./gradlew assemble -PcheckErrorQueue
+          ./gradlew assemble -PcheckErrorQueue --info --stacktrace
           # check the generated jar file
+          echo "Checking for generated jar files..."
           ls openjdk/build/libs/tongsuo-*.jar
           find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
 
       - name: Test with Gradle
         shell: bash
-        run: ./gradlew test -PcheckErrorQueue
+        run: ./gradlew test -PcheckErrorQueue --info --stacktrace
 
       - name: Other checks with Gradle
         shell: bash
-        run: ./gradlew check -PcheckErrorQueue
+        run: ./gradlew check -PcheckErrorQueue --info --stacktrace
 
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -249,30 +250,31 @@ jobs:
       - name: Build with Gradle
         shell: bash
         run: |
-          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1
+          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
           # check the generated jar file
+          echo "Checking for generated jar files..."
           ls openjdk/build/libs/tongsuo-*.jar
           find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
 
       - name: Test with Gradle on Windows or macOS
         if: runner.os == 'Windows' || runner.os == 'macOS'
         shell: bash
-        run: ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1
+        run: ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
 
       - name: Test with Gradle on Linux
         if: runner.os == 'Linux'
         shell: bash
-        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1
+        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
 
       - name: Other checks with Gradle on Windows or macOS
         if: runner.os == 'Windows' || runner.os =='macOS'
         shell: bash
-        run: ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1
+        run: ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
 
       - name: Other checks with Gradle on Linux
         if: runner.os == 'Linux'
         shell: bash
-        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1
+        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
 
       - name: Rename to dynamic jar
         shell: bash
