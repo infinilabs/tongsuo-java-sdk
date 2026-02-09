@@ -199,7 +199,7 @@ jobs:
           # For Windows ARM64 cross-compilation on Linux, use mingw64
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm no-apps"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Set resource compiler (Configure will add prefix automatically)
             export RC="windres"
@@ -222,12 +222,7 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          # For Windows ARM64 cross-compilation, only build libraries (skip apps with resource files)
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            make -s -j4 build_libs
-          else
-            make -s -j4
-          fi
+          make -s -j4
           
           echo "Installing..."
           make install
@@ -528,7 +523,7 @@ jobs:
           # For Windows ARM64 cross-compilation on Linux, use mingw64
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm no-apps"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Set resource compiler (Configure will add prefix automatically)
             export RC="windres"
@@ -551,12 +546,7 @@ jobs:
             ${CONFIG_ARGS}
             
           echo "Building..."
-          # For Windows ARM64 cross-compilation, only build libraries (skip apps with resource files)
-          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            make -s -j4 build_libs
-          else
-            make -s -j4
-          fi
+          make -s -j4
           
           echo "Installing..."
           make install
