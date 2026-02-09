@@ -40,15 +40,15 @@ jobs:
       matrix:
         platform: [
           {
-            os: ubuntu-24.04,
+            os: ubuntu-latest,
             target: linux-x86_64
           },
           {
-            os: ubuntu-22.04-arm,
+            os: ubuntu-latest-arm,
             target: linux-aarch64
           },
           {
-            os: macos-14,
+            os: macos-latest,
             target: darwin64-x86_64
           },
           {
@@ -89,10 +89,22 @@ jobs:
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           pushd ${{ github.workspace }}/Tongsuo
-          perl ./config --banner=Configured ${{ matrix.platform.target }} --prefix=$TONGSUO_HOME --libdir=$TONGSUO_HOME/lib enable-weak-ssl-ciphers enable-ntls no-shared \
-                --strict-warnings --release -fstack-protector-strong 
+          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+            export CC="clang -arch x86_64"
+            echo "Cross-compiling for x86_64 on macOS ARM64 runner..."
+          fi
+          perl ./config --banner=Configured ${{ matrix.platform.target }} \
+                --prefix=$TONGSUO_HOME \
+                --libdir=$TONGSUO_HOME/lib \
+                --strict-warnings --release -fstack-protector-strong \
+                enable-weak-ssl-ciphers enable-ntls no-shared \
           make -s -j4
           make install
+
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "Checking for static library on macOS..."
+            file $TONGSUO_HOME/lib/libcrypto.a
+          fi
           popd
 
       - uses: ilammy/msvc-dev-cmd@v1
@@ -106,7 +118,11 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd ${{ github.workspace }}\Tongsuo
-          perl .\Configure --banner=Configured ${{ matrix.platform.target }} --prefix=$Env:TONGSUO_HOME no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls no-shared --release
+          perl .\Configure --banner=Configured ${{ matrix.platform.target }} \
+                          --prefix=$Env:TONGSUO_HOME \
+                          --release \
+                          no-capieng no-makedepend \
+                          enable-weak-ssl-ciphers enable-ntls no-shared
           nmake /S
           nmake install
           Get-ChildItem -Force -LiteralPath $Env:TONGSUO_HOME\lib
@@ -199,8 +215,15 @@ jobs:
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           pushd ${{ github.workspace }}/Tongsuo
-          perl ./config --banner=Configured ${{ matrix.platform.target }} --prefix=$TONGSUO_HOME --libdir=$TONGSUO_HOME/lib enable-weak-ssl-ciphers enable-ntls \
-                --strict-warnings --release
+          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+            export CC="clang -arch x86_64"
+            echo "Cross-compiling for x86_64 on macOS ARM64 runner..."
+          fi
+          perl ./config --banner=Configured ${{ matrix.platform.target }} \
+                        --prefix=$TONGSUO_HOME \
+                        --libdir=$TONGSUO_HOME/lib \
+                        --strict-warnings --release \
+                        enable-weak-ssl-ciphers enable-ntls
           make -s -j4
           sudo make install
           popd
@@ -216,7 +239,10 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd ${{ github.workspace }}\Tongsuo
-          perl .\Configure --banner=Configured ${{ matrix.platform.target }} --prefix=$Env:TONGSUO_HOME no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls --release
+          perl .\Configure --banner=Configured ${{ matrix.platform.target }} \
+                            --prefix=$Env:TONGSUO_HOME \
+                            --release \
+                            no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls
           nmake /S
           nmake install
           Get-ChildItem -Force -LiteralPath $Env:TONGSUO_HOME\lib
@@ -250,7 +276,11 @@ jobs:
       - name: Build with Gradle
         shell: bash
         run: |
-          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
+          ARCH_PROP=""
+          if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+             ARCH_PROP="-Parch=x86_64"
+          fi
+          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $ARCH_PROP --info --stacktrace
           # check the generated jar file
           echo "Checking for generated jar files..."
           ls openjdk/build/libs/tongsuo-*.jar
