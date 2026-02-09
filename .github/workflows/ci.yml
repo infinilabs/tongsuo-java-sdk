@@ -187,7 +187,7 @@ jobs:
           # For Windows ARM64 cross-compilation on Linux, use mingw64
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32-"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
@@ -496,7 +496,7 @@ jobs:
           # For Windows ARM64 cross-compilation on Linux, use mingw64
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             CONFIG_TARGET="mingw64"
-            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32-"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
