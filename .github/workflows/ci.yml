@@ -330,33 +330,36 @@ jobs:
           echo "$TONGSUO_HOME/bin" >> $GITHUB_PATH
           echo "$TONGSUO_HOME/lib" >> $GITHUB_PATH
 
-      - name: Gradle Check (Dynamic)
+      - name: Gradle Check
         shell: bash
         run: |
           GRADLE_ARGS=""
+          TASK="check"
           
-          # Add arch parameter for macOS x86_64 cross-compilation
+          # MacOS x86_64 cross-compile setup
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
             GRADLE_ARGS="-Parch=x86_64"
+            TASK="assemble"
+            echo "⚠️ Skipping tests for macOS x86_64 (Cross-compilation)"
           fi
 
-          # Add arch parameter for Windows ARM64
+          # Windows ARM64: Cannot run tests on x64 runner, only build
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
-          fi
-
-          # Set runtime library paths
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-             export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
-          elif [[ "${{ runner.os }}" == "macOS" ]]; then
-             export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
+            TASK="assemble"
+            echo "⚠️ Skipping tests for Windows ARM64 (Cross-compilation)"
           fi
           
-          echo "Running Gradle check..."
-          ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          # Windows Path
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+          fi
+          
+          echo "Running Gradle $TASK..."
+          ./gradlew $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Build Test JAR with Dynamic Lib Dep (Linux x64 Only)
-        if: matrix.platform.target == 'linux-x86_64'
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
@@ -376,7 +379,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Test JAR
-        if: matrix.platform.target == 'linux-x86_64'
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v6
         with:
           name: jar-dynamic-${{ matrix.platform.name }}
