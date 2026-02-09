@@ -740,8 +740,16 @@ jobs:
              export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
           fi
           
+          # Convert path to Windows format if needed
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+            TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
+          fi
+          
           echo "Running Gradle Test with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
