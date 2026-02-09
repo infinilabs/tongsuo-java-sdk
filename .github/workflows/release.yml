@@ -280,13 +280,18 @@ jobs:
           GRADLE_CMD="./gradlew"
           
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           
-          echo "Building JAR..."
-          $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
+          fi
+          
+          echo "Building JAR with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
         # Skip Java SDK build for Windows ARM64
@@ -297,11 +302,17 @@ jobs:
           GRADLE_CMD="./gradlew"
           
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
+          
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
+          fi
+          
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
           fi
@@ -311,7 +322,8 @@ jobs:
              export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
           fi
           
-          $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          echo "Running tests with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -588,10 +600,16 @@ jobs:
           GRADLE_CMD="./gradlew"
           
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
+          
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
+          fi
+          
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
              export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
@@ -599,8 +617,8 @@ jobs:
              export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
           fi
           
-          echo "Running Gradle Assemble..."
-          $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          echo "Running Gradle Assemble with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
         # Skip Java SDK build for Windows ARM64
@@ -611,11 +629,17 @@ jobs:
           GRADLE_CMD="./gradlew"
           
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
+          
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
+          fi
+          
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
              export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
@@ -623,8 +647,8 @@ jobs:
              export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
           fi
           
-          echo "Running Gradle Test..."
-          $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          echo "Running Gradle Test with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

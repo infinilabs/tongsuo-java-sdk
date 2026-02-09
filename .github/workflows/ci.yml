@@ -301,9 +301,14 @@ jobs:
           
           # For macOS x86_64 on ARM, use Rosetta 2 to run x86_64 JDK
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
+          fi
+          
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
           fi
 
           # Add arch parameter for Windows ARM64
@@ -316,8 +321,8 @@ jobs:
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
           fi
           
-          echo "Running Gradle check..."
-          $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          echo "Running Gradle check with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build
         if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true
@@ -631,11 +636,16 @@ jobs:
           
           # MacOS x86_64: Use Rosetta 2 to run x86_64 JDK and tests
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-            GRADLE_ARGS="-Parch=x86_64"
+            GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
             TASK="check"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
+          fi
+          
+          # For macOS ARM64, explicitly set arm64 architecture
+          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
           fi
           
           # Windows Path
@@ -643,8 +653,8 @@ jobs:
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
           fi
           
-          echo "Running Gradle $TASK..."
-          $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
+          eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build (Dynamic)
         if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true
