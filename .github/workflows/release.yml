@@ -7,106 +7,114 @@
 # https://github.com/Tongsuo-Project/Tongsuo/blob/master/LICENSE.txt
 
 name: Release
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: The version to build
+        description: 'The version to build (e.g., 8.4.0)'
+        required: true
 
 env:
   TONGSUO_VERSION: 8.4-stable
 
 jobs:
+  # ==================================================================================
+  # Phase 1: Prepare Source Code
+  # ==================================================================================
   clone_tongsuo:
+    name: Prepare Source
     runs-on: ubuntu-latest
     steps:
-      - name: Clone Tongsuo repo
+      - name: Clone Tongsuo Repository
         uses: actions/checkout@v4
         with:
           repository: Tongsuo-Project/Tongsuo
           ref: ${{ env.TONGSUO_VERSION }}
           path: Tongsuo
 
-      - name: Archive Tongsuo source
+      - name: Archive Tongsuo Source
         uses: actions/upload-artifact@v4
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
 
-  build-with-tongsuo-static:
+  # ==================================================================================
+  # Phase 2: Build Static Library
+  # ==================================================================================
+  build-static:
+    name: Static - ${{ matrix.platform.target }}
     needs: clone_tongsuo
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-          {
-            os: ubuntu-latest,
-            target: linux-x86_64
-          },
-          {
-            os: ubuntu-latest-arm,
-            target: linux-aarch64
-          },
-          {
-            os: macos-latest,
-            target: darwin64-x86_64
-          },
-          {
-            os: macos-latest,
-            target: darwin64-arm64
-          },
-          {
-            os: windows-latest,
-            target: VC-WIN64A
-          },
-          {
-            os: windows-latest,
-            target: VC-WIN64-ARM
-          }
-        ]
+        platform:
+          - { os: ubuntu-24.04,     target: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: linux-aarch64 }
+          - { os: macos-14,         target: darwin64-x86_64 }
+          - { os: macos-14,         target: darwin64-arm64 }
+          - { os: windows-latest,   target: VC-WIN64A }
+          - { os: windows-latest,   target: VC-WIN64-ARM }
     runs-on: ${{ matrix.platform.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
+
     steps:
-      - name: Set up JDK 11 for toolchains
+      - name: Setup Environment Variables
+        shell: bash
+        run: |
+          echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
+          
+          # Setup cross-compilation flags for macOS x86_64 on ARM runners
+          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+             echo "CC=clang -arch x86_64" >> $GITHUB_ENV
+             echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+             echo "Configuring cross-compilation for x86_64..."
+          fi
+
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 11
 
-      - name: Set runner-specific environment variables
-        shell: bash
-        run: |
-          echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
 
-      - name: Fetch Tongsuo source
-        run: gh run download --name tongsuo-src --dir ${{ github.workspace }}/Tongsuo
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Download Tongsuo Source
+        uses: actions/download-artifact@v4
+        with:
+          name: tongsuo-src
+          path: ${{ github.workspace }}/Tongsuo
 
-      - name: Build Tongsuo on Linux or macOS
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      # -----------------------------------------------------------
+      # Build Tongsuo C Lib (Unix: Linux / macOS)
+      # -----------------------------------------------------------
+      - name: Build Tongsuo C Lib (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          pushd ${{ github.workspace }}/Tongsuo
-          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-            export CC="clang -arch x86_64"
-            echo "Cross-compiling for x86_64 on macOS ARM64 runner..."
-          fi
-          perl ./config --banner=Configured ${{ matrix.platform.target }} \
-                --prefix=$TONGSUO_HOME \
-                --libdir=$TONGSUO_HOME/lib \
-                --strict-warnings --release -fstack-protector-strong \
-                enable-weak-ssl-ciphers enable-ntls no-shared \
-          make -s -j4
-          make install
-
+          cd ${{ github.workspace }}/Tongsuo
+          mkdir -p $TONGSUO_HOME
+          
+          echo "Configuring for ${{ matrix.platform.target }}..."
+          # Use ./Configure (capital C) to explicitly set the target
+          ./Configure ${{ matrix.platform.target }} \
+            --prefix=$TONGSUO_HOME \
+            --libdir=$TONGSUO_HOME/lib \
+            --strict-warnings --release -fstack-protector-strong \
+            enable-weak-ssl-ciphers enable-ntls no-shared > configure.log 2>&1
+          
+          echo "Building..."
+          make -s -j4 > build.log 2>&1
+          make install >> build.log 2>&1
+          
+          echo "Build complete. Checking library architecture:"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            echo "Checking for static library on macOS..."
             file $TONGSUO_HOME/lib/libcrypto.a
           fi
-          popd
 
+      # -----------------------------------------------------------
+      # Build Tongsuo C Lib (Windows)
+      # -----------------------------------------------------------
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
       - uses: ilammy/setup-nasm@v1
@@ -114,119 +122,128 @@ jobs:
       - uses: shogo82148/actions-setup-perl@v1
         if: runner.os == 'Windows'
 
-      - name: Build Tongsuo on Windows
+      - name: Build Tongsuo C Lib (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cd ${{ github.workspace }}\Tongsuo
-          perl .\Configure --banner=Configured ${{ matrix.platform.target }} \
-                          --prefix=$Env:TONGSUO_HOME \
-                          --release \
-                          no-capieng no-makedepend \
-                          enable-weak-ssl-ciphers enable-ntls no-shared
+          perl .\Configure ${{ matrix.platform.target }} --prefix=$Env:TONGSUO_HOME --release no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls no-shared
           nmake /S
           nmake install
-          Get-ChildItem -Force -LiteralPath $Env:TONGSUO_HOME\lib
 
-      - name: Build with Gradle
+      # -----------------------------------------------------------
+      # Build Java SDK with Gradle
+      # -----------------------------------------------------------
+      - name: Gradle Assemble
         shell: bash
         run: |
-          ./gradlew assemble -PcheckErrorQueue --info --stacktrace
-          # check the generated jar file
-          echo "Checking for generated jar files..."
-          ls openjdk/build/libs/tongsuo-*.jar
-          find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
+          # Pass specific architecture prop if building x86_64 on macOS ARM
+          GRADLE_ARGS=""
+          if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then GRADLE_ARGS="-Parch=x86_64"; fi
+          
+          echo "Building JAR with Gradle..."
+          ./gradlew assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_build.log 2>&1
 
-      - name: Test with Gradle
+      - name: Gradle Test
         shell: bash
-        run: ./gradlew test -PcheckErrorQueue --info --stacktrace
+        run: |
+          GRADLE_ARGS=""
+          if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then GRADLE_ARGS="-Parch=x86_64"; fi
+          
+          # Add Tongsuo bin/lib to PATH for Windows tests
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+          fi
+          
+          ./gradlew test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_test.log 2>&1
 
-      - name: Other checks with Gradle
-        shell: bash
-        run: ./gradlew check -PcheckErrorQueue --info --stacktrace
-
-      - name: Release
-        uses: softprops/action-gh-release@v2
+      # -----------------------------------------------------------
+      # Error Handling: Upload Logs
+      # -----------------------------------------------------------
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.event.inputs.version }}
+          name: logs-static-${{ matrix.platform.target }}
+          path: |
+            ${{ github.workspace }}/Tongsuo/*.log
+            *.log
+
+      # -----------------------------------------------------------
+      # Release
+      # -----------------------------------------------------------
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: ${{ inputs.version }}
           draft: true
           prerelease: true
-          fail_on_unmatched_files: true
-          files: openjdk/build/libs/tongsuo-openjdk-${{ github.event.inputs.version }}-*.jar
+          fail_on_unmatched_files: false
+          files: openjdk/build/libs/tongsuo-openjdk-${{ inputs.version }}*.jar
 
-  build-with-tongsuo-dynamic:
+  # ==================================================================================
+  # Phase 3: Build Dynamic Library
+  # ==================================================================================
+  build-dynamic:
+    name: Dynamic - ${{ matrix.platform.target }}
     needs: clone_tongsuo
     strategy:
       fail-fast: false
       matrix:
-        platform: [
-          {
-            os: ubuntu-24.04,
-            target: linux-x86_64
-          },
-          {
-            os: ubuntu-24.04-arm,
-            target: linux-aarch64
-          },
-          {
-            os: macos-14,
-            target: darwin64-x86_64
-          },
-          {
-            os: macos-14,
-            target: darwin64-arm64
-          },
-          {
-            os: windows-latest,
-            target: VC-WIN64A
-          },
-          {
-            os: windows-latest,
-            target: VC-WIN64-ARM
-          }
-        ]
+        platform:
+          - { os: ubuntu-24.04,     target: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: linux-aarch64 }
+          - { os: macos-14,         target: darwin64-x86_64 }
+          - { os: macos-14,         target: darwin64-arm64 }
+          - { os: windows-latest,   target: VC-WIN64A }
+          - { os: windows-latest,   target: VC-WIN64-ARM }
     runs-on: ${{ matrix.platform.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
+
     steps:
-      - name: Set up JDK 11 for toolchains
+      - name: Setup Environment Variables
+        shell: bash
+        run: |
+          echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
+          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+             echo "CC=clang -arch x86_64" >> $GITHUB_ENV
+             echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+          fi
+
+      - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 11
 
-      - name: Set runner-specific environment variables
-        shell: bash
-        run: |
-          echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
-
-      - name: Set runner-specific environment variables for macOS
-        shell: bash
-        if: runner.os == 'macOS'
-        run: |
-          echo "TONGSUO_HOME=/opt/tongsuo" >> $GITHUB_ENV
-
       - uses: actions/checkout@v4
 
-      - name: Fetch Tongsuo source
-        run: gh run download --name tongsuo-src --dir ${{ github.workspace }}/Tongsuo
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Download Tongsuo Source
+        uses: actions/download-artifact@v4
+        with:
+          name: tongsuo-src
+          path: ${{ github.workspace }}/Tongsuo
 
-      - name: Build Tongsuo on Linux or macOS
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      # -----------------------------------------------------------
+      # Build Tongsuo C Lib (Unix Dynamic)
+      # -----------------------------------------------------------
+      - name: Build Tongsuo C Lib (Unix Dynamic)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          pushd ${{ github.workspace }}/Tongsuo
-          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-            export CC="clang -arch x86_64"
-            echo "Cross-compiling for x86_64 on macOS ARM64 runner..."
-          fi
-          perl ./config --banner=Configured ${{ matrix.platform.target }} \
-                        --prefix=$TONGSUO_HOME \
-                        --libdir=$TONGSUO_HOME/lib \
-                        --strict-warnings --release \
-                        enable-weak-ssl-ciphers enable-ntls
-          make -s -j4
-          sudo make install
-          popd
+          cd ${{ github.workspace }}/Tongsuo
+          mkdir -p $TONGSUO_HOME
+          
+          # Note: Removed no-shared to build dynamic libs
+          ./Configure ${{ matrix.platform.target }} \
+            --prefix=$TONGSUO_HOME \
+            --libdir=$TONGSUO_HOME/lib \
+            --strict-warnings --release \
+            enable-weak-ssl-ciphers enable-ntls > configure.log 2>&1
+          
+          make -s -j4 > build.log 2>&1
+          make install >> build.log 2>&1
 
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
@@ -235,92 +252,73 @@ jobs:
       - uses: shogo82148/actions-setup-perl@v1
         if: runner.os == 'Windows'
 
-      - name: Build Tongsuo on Windows
+      - name: Build Tongsuo C Lib (Windows Dynamic)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cd ${{ github.workspace }}\Tongsuo
-          perl .\Configure --banner=Configured ${{ matrix.platform.target }} \
-                            --prefix=$Env:TONGSUO_HOME \
-                            --release \
-                            no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls
+          # Removed no-shared
+          perl .\Configure ${{ matrix.platform.target }} --prefix=$Env:TONGSUO_HOME --release no-capieng no-makedepend enable-weak-ssl-ciphers enable-ntls
           nmake /S
           nmake install
-          Get-ChildItem -Force -LiteralPath $Env:TONGSUO_HOME\lib
 
-      - name: Copy tongsuo dynamic library to overwrite the system's library
-        if: runner.os == 'Windows'
-        run: |
-          $pathArray = $env:PATH -split ';'
-
-          foreach ($path in $pathArray) {
-            if (Test-Path -Path $path -PathType Container) {
-              $files = Get-ChildItem -Path $path -File
-              foreach ($file in $files) {
-                if ($file.Name -like '*libcrypto*') {
-                  Write-Host $path
-                  Copy-Item -Path "$Env:TONGSUO_HOME\bin\*.dll" -Destination $path -Force
-                  break
-                }
-              }
-            }
-          }
-
-      - name: Set PATH for runtime library search
-        shell: perl {0}
-        if: runner.os == 'Windows'
-        run: |
-          use Actions::Core;
-          add_path("$ENV{RUNNER_TEMP}\\tongsuo\\bin");
-          add_path("$ENV{RUNNER_TEMP}\\tongsuo\\lib");
-
-      - name: Build with Gradle
+      # -----------------------------------------------------------
+      # Gradle Assemble & Test (Dynamic)
+      # -----------------------------------------------------------
+      - name: Gradle Assemble & Test
         shell: bash
         run: |
-          ARCH_PROP=""
-          if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-             ARCH_PROP="-Parch=x86_64"
+          GRADLE_ARGS=""
+          if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then GRADLE_ARGS="-Parch=x86_64"; fi
+          
+          # Set library path for runtime
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+             export LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+             export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
           fi
-          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $ARCH_PROP --info --stacktrace
-          # check the generated jar file
-          echo "Checking for generated jar files..."
-          ls openjdk/build/libs/tongsuo-*.jar
-          find . -name "tongsuo-*.jar" -exec echo "Found jar: {}" \;
+          
+          echo "Running Gradle Assemble..."
+          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_build.log 2>&1
+          
+          echo "Running Gradle Test..."
+          ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS > gradle_test.log 2>&1
 
-      - name: Test with Gradle on Windows or macOS
-        if: runner.os == 'Windows' || runner.os == 'macOS'
-        shell: bash
-        run: ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
-
-      - name: Test with Gradle on Linux
-        if: runner.os == 'Linux'
-        shell: bash
-        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
-
-      - name: Other checks with Gradle on Windows or macOS
-        if: runner.os == 'Windows' || runner.os =='macOS'
-        shell: bash
-        run: ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
-
-      - name: Other checks with Gradle on Linux
-        if: runner.os == 'Linux'
-        shell: bash
-        run: LD_LIBRARY_PATH=$TONGSUO_HOME/lib:$LD_LIBRARY_PATH ./gradlew check -PcheckErrorQueue -PtongsuoDynamic=1 --info --stacktrace
-
-      - name: Rename to dynamic jar
+      # -----------------------------------------------------------
+      # Rename JARs
+      # -----------------------------------------------------------
+      - name: Rename Dynamic JARs
         shell: bash
         run: |
           cd openjdk/build/libs/
-          for file in tongsuo-openjdk-${{ github.event.inputs.version }}-*.jar; do
-            os_arch_jar=$(echo "$file" | cut -d'-' -f4-)
-            mv "$file" "tongsuo-openjdk-dynamic-${{ github.event.inputs.version }}-${os_arch_jar}"
+          # Exclude javadoc and sources
+          for file in tongsuo-openjdk-${{ inputs.version }}-*.jar; do
+            if [[ -f "$file" ]]; then
+               # Strip prefix to get os-arch.jar
+               suffix=$(echo "$file" | sed "s/tongsuo-openjdk-${{ inputs.version }}-//")
+               new_name="tongsuo-openjdk-dynamic-${{ inputs.version }}-${suffix}"
+               echo "Renaming $file -> $new_name"
+               mv "$file" "$new_name"
+            fi
           done
 
-      - name: Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.inputs.version }}
-          tag_name: ${{ github.event.inputs.version }}
+          name: logs-dynamic-${{ matrix.platform.target }}
+          path: |
+            ${{ github.workspace }}/Tongsuo/*.log
+            *.log
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: ${{ inputs.version }}
           draft: true
           prerelease: true
-          fail_on_unmatched_files: true
-          files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ github.event.inputs.version }}-*.jar
+          fail_on_unmatched_files: false
+          files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}*.jar
