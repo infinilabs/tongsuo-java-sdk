@@ -182,6 +182,29 @@ jobs:
       # -----------------------------------------------------------
       # Gradle Build & Test
       # -----------------------------------------------------------
+      - name: Setup Gradle Repository Override
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          # Create init.gradle to override repositories with official Maven Central
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'INITGRADLE'
+          allprojects {
+            buildscript {
+              repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              google()
+              mavenCentral()
+            }
+          }
+          INITGRADLE
+          echo "Created Gradle init script to use official repositories"
+
       - name: Gradle Check
         # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
         if: matrix.platform.target != 'VC-WIN64-ARM'
@@ -428,6 +451,29 @@ jobs:
         run: |
           echo "$TONGSUO_HOME/bin" >> $GITHUB_PATH
           echo "$TONGSUO_HOME/lib" >> $GITHUB_PATH
+
+      - name: Setup Gradle Repository Override
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          # Create init.gradle to override repositories with official Maven Central
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'INITGRADLE'
+          allprojects {
+            buildscript {
+              repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              google()
+              mavenCentral()
+            }
+          }
+          INITGRADLE
+          echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
         # Skip Java SDK build for Windows ARM64 (cross-compilation issues)

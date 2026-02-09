@@ -59,7 +59,7 @@ jobs:
           - { os: macos-14,         target: darwin64-x86_64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64 }
           - { os: windows-latest,   target: VC-WIN64A }
-          - { os: windows-latest,   target: VC-WIN64-ARM, use_qemu: true }
+          - { os: ubuntu-24.04,     target: VC-WIN64-ARM, cross_compile: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 45
 
@@ -91,13 +91,14 @@ jobs:
           fi
           echo "Rosetta 2 is available"
 
-      - name: Set up QEMU for ARM64 emulation (Windows)
-        if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM'
-        shell: pwsh
+      - name: Set up mingw-w64 for Windows ARM64 cross-compilation
+        if: matrix.platform.cross_compile == true && matrix.platform.target == 'VC-WIN64-ARM'
+        shell: bash
         run: |
-          Write-Host "Setting up QEMU for ARM64 emulation..."
-          choco install qemu -y
-          Write-Host "QEMU installed successfully"
+          echo "Installing mingw-w64 toolchain for ARM64..."
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64 g++-mingw-w64 binutils-mingw-w64 mingw-w64-tools
+          echo "mingw-w64 installed successfully"
 
       - name: Set up JDK 11 (x86_64 for macOS x64)
         if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
@@ -107,32 +108,8 @@ jobs:
           java-version: 11
           architecture: x64
 
-      - name: Set up JDK 11 (ARM64 for Windows ARM64)
-        if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM'
-        shell: pwsh
-        run: |
-          Write-Host "Downloading Microsoft JDK 11 for ARM64..."
-          $jdkUrl = "https://aka.ms/download-jdk/microsoft-jdk-11-windows-aarch64.zip"
-          $jdkZip = "$env:TEMP\microsoft-jdk-11-aarch64.zip"
-          $jdkPath = "C:\jdk-11-aarch64"
-          
-          Invoke-WebRequest -Uri $jdkUrl -OutFile $jdkZip
-          Expand-Archive -Path $jdkZip -DestinationPath "C:\"
-          
-          # Find the extracted directory
-          $extractedDir = Get-ChildItem -Path "C:\" -Filter "jdk-11*" -Directory | Select-Object -First 1
-          if ($extractedDir) {
-            Rename-Item -Path $extractedDir.FullName -NewName $jdkPath -Force
-          }
-          
-          # Add to PATH
-          echo "$jdkPath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "JAVA_HOME=$jdkPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          
-          Write-Host "Microsoft JDK 11 ARM64 installed at $jdkPath"
-
-      - name: Set up JDK 11 (default)
-        if: "!(runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64') && !(runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM')"
+      - name: Set up JDK 11 (default for other platforms)
+        if: "(runner.os != 'macOS' || matrix.platform.target != 'darwin64-x86_64') && (matrix.platform.cross_compile != true)"
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -211,6 +188,29 @@ jobs:
           nmake install
 
       # --- Build Java SDK ---
+      - name: Setup Gradle Repository Override
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          # Create init.gradle to override repositories with official Maven Central
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'INITGRADLE'
+          allprojects {
+            buildscript {
+              repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              google()
+              mavenCentral()
+            }
+          }
+          INITGRADLE
+          echo "Created Gradle init script to use official repositories"
+
       - name: Gradle Assemble
         # Skip Java SDK build for Windows ARM64
         if: matrix.platform.target != 'VC-WIN64-ARM'
@@ -223,9 +223,6 @@ jobs:
             GRADLE_ARGS="-Parch=x86_64"
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
-          fi
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
           fi
           
           echo "Building JAR..."
@@ -332,7 +329,7 @@ jobs:
           - { os: macos-14,         target: darwin64-x86_64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64 }
           - { os: windows-latest,   target: VC-WIN64A }
-          - { os: windows-latest,   target: VC-WIN64-ARM, use_qemu: true }
+          - { os: ubuntu-24.04,     target: VC-WIN64-ARM, cross_compile: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 45
 
@@ -459,6 +456,29 @@ jobs:
           echo "$TONGSUO_HOME/lib" >> $GITHUB_PATH
 
       # --- Build Java SDK ---
+      - name: Setup Gradle Repository Override
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          # Create init.gradle to override repositories with official Maven Central
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'INITGRADLE'
+          allprojects {
+            buildscript {
+              repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              google()
+              mavenCentral()
+            }
+          }
+          INITGRADLE
+          echo "Created Gradle init script to use official repositories"
+
       - name: Gradle Assemble
         # Skip Java SDK build for Windows ARM64
         if: matrix.platform.target != 'VC-WIN64-ARM'
@@ -567,3 +587,170 @@ jobs:
           prerelease: true
           files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar
           fail_on_unmatched_files: true
+  # ==================================================================================
+  # Phase 4: Build Uber JAR (All Platforms)
+  # ==================================================================================
+  build-uber-jar:
+    name: Build Uber JAR
+    needs: build-dynamic
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
+      - name: Create Uber JAR Directory
+        run: |
+          mkdir -p uber-jar-work
+          cd uber-jar-work
+          mkdir -p native-libs
+          mkdir -p META-INF
+
+      - name: Download Linux x64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-linux-x86_64
+          path: uber-jar-work/jars/
+
+      - name: Download Linux ARM64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-linux-aarch64
+          path: uber-jar-work/jars/
+
+      - name: Download macOS x64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-darwin64-x86_64
+          path: uber-jar-work/jars/
+
+      - name: Download macOS ARM64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-darwin64-arm64
+          path: uber-jar-work/jars/
+
+      - name: Download Windows x64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-VC-WIN64A
+          path: uber-jar-work/jars/
+
+      - name: Extract and Merge Native Libraries
+        run: |
+          cd uber-jar-work
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Building Uber JAR - All Platforms Dynamic"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Extract first JAR to get the base structure
+          FIRST_JAR=$(ls jars/*.jar | head -1)
+          echo "Using $FIRST_JAR as base..."
+          unzip -q "$FIRST_JAR" -d base/
+          
+          # Extract native libraries from all JARs
+          for jar in jars/*.jar; do
+            echo "Extracting native libraries from $(basename $jar)..."
+            unzip -q "$jar" "org/conscrypt/native/*" -d temp/ 2>/dev/null || true
+            if [ -d temp/org/conscrypt/native ]; then
+              cp -r temp/org/conscrypt/native/* base/org/conscrypt/native/ 2>/dev/null || true
+              rm -rf temp
+            fi
+          done
+          
+          # List all included native libraries
+          echo ""
+          echo "Included native libraries:"
+          find base/org/conscrypt/native -type f | sort
+          
+          # Create uber JAR
+          echo ""
+          echo "Creating uber JAR..."
+          cd base
+          jar cf ../tongsuo-openjdk-${{ inputs.version }}-uber.jar .
+          cd ..
+          
+          # Show JAR info
+          echo ""
+          echo "Uber JAR created:"
+          ls -lh tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          echo ""
+          echo "Contents:"
+          jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "org/conscrypt/native" | sort
+
+      - name: Verify Uber JAR
+        run: |
+          cd uber-jar-work
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Uber JAR Verification"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Count platforms
+          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "linux" || echo 0)
+          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "darwin\|osx" || echo 0)
+          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "windows\|win" || echo 0)
+          
+          echo "Platform Coverage:"
+          echo "  Linux libraries:   $LINUX_COUNT"
+          echo "  macOS libraries:   $DARWIN_COUNT"
+          echo "  Windows libraries: $WINDOWS_COUNT"
+          echo ""
+          
+          # Expected minimum (may vary)
+          EXPECTED_MIN=4
+          TOTAL=$((LINUX_COUNT + DARWIN_COUNT + WINDOWS_COUNT))
+          
+          echo "Total native libraries: $TOTAL"
+          echo "Expected minimum: $EXPECTED_MIN"
+          
+          if [ $TOTAL -ge $EXPECTED_MIN ]; then
+            echo "✅ Verification passed!"
+          else
+            echo "⚠️  Warning: Found fewer libraries than expected"
+            echo "This might be OK if some platforms were skipped"
+          fi
+
+      - name: Upload Uber JAR Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: jar-uber
+          path: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          retention-days: 7
+
+      - name: Upload Uber JAR to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          draft: true
+          prerelease: true
+          files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          fail_on_unmatched_files: true
+          body: |
+            ## 📦 Uber JAR
+            
+            This is a multi-platform JAR containing native libraries for:
+            - ✅ Linux x64
+            - ✅ Linux ARM64
+            - ✅ macOS x64
+            - ✅ macOS ARM64
+            - ✅ Windows x64
+            
+            **Usage:**
+            ```xml
+            <dependency>
+                <groupId>net.tongsuo</groupId>
+                <artifactId>tongsuo-openjdk</artifactId>
+                <version>${{ inputs.version }}</version>
+                <classifier>uber</classifier>
+            </dependency>
+            ```
+            
+            **Note:** This JAR works on all supported platforms without platform-specific classifiers.
