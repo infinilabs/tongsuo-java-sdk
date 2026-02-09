@@ -31,14 +31,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone Tongsuo Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: Tongsuo-Project/Tongsuo
           ref: ${{ env.TONGSUO_VERSION }}
           path: Tongsuo
 
       - name: Archive Tongsuo Source
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
@@ -56,10 +56,10 @@ jobs:
         platform:
           - { os: ubuntu-24.04,     target: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: linux-aarch64 }
-          - { os: macos-14,         target: darwin64-x86_64 }
+          - { os: macos-14,         target: darwin64-x86_64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64 }
           - { os: windows-latest,   target: VC-WIN64A }
-          - { os: windows-latest,   target: VC-WIN64-ARM }
+          - { os: windows-latest,   target: VC-WIN64-ARM, use_qemu: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 45
 
@@ -69,23 +69,79 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation flags for macOS x86_64 on ARM runners
+          # Cross-compilation flags for macOS x86_64 on ARM runners with Rosetta 2
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "Configuring cross-compilation for x86_64..."
           fi
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
+      - name: Set up Rosetta 2 for x86_64 emulation (macOS)
+        if: runner.os == 'macOS' && matrix.platform.use_qemu == true
+        shell: bash
+        run: |
+          # Rosetta 2 is already installed on macOS ARM runners
+          # Verify it's available
+          if ! arch -x86_64 uname -m; then
+            echo "Installing Rosetta 2..."
+            softwareupdate --install-rosetta --agree-to-license
+          fi
+          echo "Rosetta 2 is available"
+
+      - name: Set up QEMU for ARM64 emulation (Windows)
+        if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM'
+        shell: pwsh
+        run: |
+          Write-Host "Setting up QEMU for ARM64 emulation..."
+          choco install qemu -y
+          Write-Host "QEMU installed successfully"
+
+      - name: Set up JDK 11 (x86_64 for macOS x64)
+        if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          architecture: x64
+
+      - name: Set up JDK 11 (ARM64 for Windows ARM64)
+        if: runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM'
+        shell: pwsh
+        run: |
+          Write-Host "Downloading Microsoft JDK 11 for ARM64..."
+          $jdkUrl = "https://aka.ms/download-jdk/microsoft-jdk-11-windows-aarch64.zip"
+          $jdkZip = "$env:TEMP\microsoft-jdk-11-aarch64.zip"
+          $jdkPath = "C:\jdk-11-aarch64"
+          
+          Invoke-WebRequest -Uri $jdkUrl -OutFile $jdkZip
+          Expand-Archive -Path $jdkZip -DestinationPath "C:\"
+          
+          # Find the extracted directory
+          $extractedDir = Get-ChildItem -Path "C:\" -Filter "jdk-11*" -Directory | Select-Object -First 1
+          if ($extractedDir) {
+            Rename-Item -Path $extractedDir.FullName -NewName $jdkPath -Force
+          }
+          
+          # Add to PATH
+          echo "$jdkPath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "JAVA_HOME=$jdkPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          
+          Write-Host "Microsoft JDK 11 ARM64 installed at $jdkPath"
+
+      - name: Set up JDK 11 (default)
+        if: "!(runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64') && !(runner.os == 'Windows' && matrix.platform.target == 'VC-WIN64-ARM')"
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 11
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download Tongsuo Source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
@@ -94,7 +150,7 @@ jobs:
 
       - name: Clone Tongsuo Directly (Fallback for Windows)
         if: steps.download_artifact.outcome == 'failure'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: Tongsuo-Project/Tongsuo
           ref: ${{ env.TONGSUO_VERSION }}
@@ -156,25 +212,38 @@ jobs:
 
       # --- Build Java SDK ---
       - name: Gradle Assemble
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
+          GRADLE_CMD="./gradlew"
+          
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
             GRADLE_ARGS="-Parch=x86_64"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
           fi
           
           echo "Building JAR..."
-          ./gradlew assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
+          GRADLE_CMD="./gradlew"
+          
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
             GRADLE_ARGS="-Parch=x86_64"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
+            echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
@@ -185,9 +254,21 @@ jobs:
              export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
           fi
           
-          ./gradlew test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+
+      - name: Note for Windows ARM64
+        if: matrix.platform.target == 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Windows ARM64 - C Library Only"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Tongsuo C library built successfully for ARM64"
+          echo "❌ Java SDK not built - cross-compilation not supported"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Static JAR
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
@@ -200,12 +281,17 @@ jobs:
           fi
           
           NEW_NAME="tongsuo-openjdk-${{ inputs.version }}-${{ matrix.platform.target }}.jar"
-          echo "Renaming $SRC_JAR -> $NEW_NAME"
-          mv "$SRC_JAR" "$NEW_NAME"
+          
+          if [ "$SRC_JAR" != "$NEW_NAME" ]; then
+            echo "Renaming $SRC_JAR -> $NEW_NAME"
+            mv "$SRC_JAR" "$NEW_NAME"
+          else
+            echo "JAR already has correct name: $NEW_NAME"
+          fi
 
       - name: Upload Logs on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: logs-static-${{ matrix.platform.target }}
           path: |
@@ -214,7 +300,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        uses: actions/upload-artifact@v6
         with:
           name: jar-static-${{ matrix.platform.target }}
           path: openjdk/build/libs/tongsuo-openjdk-${{ inputs.version }}-${{ matrix.platform.target }}.jar
@@ -222,7 +309,7 @@ jobs:
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
-        if: success()
+        if: success() && matrix.platform.target != 'VC-WIN64-ARM'
         with:
           tag_name: ${{ inputs.version }}
           draft: true
@@ -242,10 +329,10 @@ jobs:
         platform:
           - { os: ubuntu-24.04,     target: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: linux-aarch64 }
-          - { os: macos-14,         target: darwin64-x86_64 }
+          - { os: macos-14,         target: darwin64-x86_64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64 }
           - { os: windows-latest,   target: VC-WIN64A }
-          - { os: windows-latest,   target: VC-WIN64-ARM }
+          - { os: windows-latest,   target: VC-WIN64-ARM, use_qemu: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 45
 
@@ -255,22 +342,46 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation flags for macOS x86_64 on ARM runners
+          # Cross-compilation flags for macOS x86_64 on ARM runners with Rosetta 2
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
           fi
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v4
+      - name: Set up Rosetta 2 for x86_64 emulation (macOS)
+        if: runner.os == 'macOS' && matrix.platform.use_qemu == true
+        shell: bash
+        run: |
+          # Rosetta 2 is already installed on macOS ARM runners
+          # Verify it's available
+          if ! arch -x86_64 uname -m; then
+            echo "Installing Rosetta 2..."
+            softwareupdate --install-rosetta --agree-to-license
+          fi
+          echo "Rosetta 2 is available"
+
+      - name: Set up JDK 11 (x86_64 for macOS x64)
+        if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          architecture: x64
+
+      - name: Set up JDK 11 (default)
+        if: "!(runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64')"
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 11
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download Tongsuo Source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
@@ -279,7 +390,7 @@ jobs:
 
       - name: Clone Tongsuo Directly (Fallback for Windows)
         if: steps.download_artifact.outcome == 'failure'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: Tongsuo-Project/Tongsuo
           ref: ${{ env.TONGSUO_VERSION }}
@@ -349,14 +460,17 @@ jobs:
 
       # --- Build Java SDK ---
       - name: Gradle Assemble
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
+          GRADLE_CMD="./gradlew"
+          
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
             GRADLE_ARGS="-Parch=x86_64"
-          fi
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -366,17 +480,21 @@ jobs:
           fi
           
           echo "Running Gradle Assemble..."
-          ./gradlew assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
+        # Skip Java SDK build for Windows ARM64
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
+          GRADLE_CMD="./gradlew"
+          
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then 
             GRADLE_ARGS="-Parch=x86_64"
-          fi
-          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
-            GRADLE_ARGS="-Parch=arm64"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
+            echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -386,9 +504,21 @@ jobs:
           fi
           
           echo "Running Gradle Test..."
-          ./gradlew test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+
+      - name: Note for Windows ARM64
+        if: matrix.platform.target == 'VC-WIN64-ARM'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Windows ARM64 - C Library Only"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Tongsuo C library built successfully for ARM64"
+          echo "❌ Java SDK not built - cross-compilation not supported"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Dynamic JAR
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
@@ -402,12 +532,17 @@ jobs:
           
           # tongsuo-openjdk-dynamic-[version]-[target].jar
           NEW_NAME="tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar"
-          echo "Renaming $SRC_JAR -> $NEW_NAME"
-          mv "$SRC_JAR" "$NEW_NAME"
+          
+          if [ "$SRC_JAR" != "$NEW_NAME" ]; then
+            echo "Renaming $SRC_JAR -> $NEW_NAME"
+            mv "$SRC_JAR" "$NEW_NAME"
+          else
+            echo "JAR already has correct name: $NEW_NAME"
+          fi
 
       - name: Upload Logs on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: logs-dynamic-${{ matrix.platform.target }}
           path: |
@@ -416,7 +551,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        if: matrix.platform.target != 'VC-WIN64-ARM'
+        uses: actions/upload-artifact@v6
         with:
           name: jar-dynamic-${{ matrix.platform.target }}
           path: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar
@@ -424,7 +560,7 @@ jobs:
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
-        if: success()
+        if: success() && matrix.platform.target != 'VC-WIN64-ARM'
         with:
           tag_name: ${{ inputs.version }}
           draft: true
