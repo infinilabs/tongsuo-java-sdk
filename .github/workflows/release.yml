@@ -490,6 +490,7 @@ jobs:
               echo "Building natively for ARM64"
             fi
           fi
+          echo "Rosetta 2 is available"
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
         if: runner.os == 'macOS' && matrix.platform.use_qemu == true
