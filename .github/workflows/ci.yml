@@ -241,11 +241,19 @@ jobs:
             Write-Host "Configuring ${{ matrix.platform.target }}..."
           }
           
-          perl .\Configure ${{ matrix.platform.target }} `
-            --prefix=$Env:TONGSUO_HOME `
-            no-capieng no-makedepend `
-            enable-weak-ssl-ciphers enable-ntls no-shared --release `
-            $configArgs
+          # Build configure command based on architecture
+          if ("${{ matrix.platform.arch }}" -eq "arm64") {
+            perl .\Configure ${{ matrix.platform.target }} `
+              --prefix=$Env:TONGSUO_HOME `
+              no-capieng no-makedepend `
+              enable-weak-ssl-ciphers enable-ntls no-shared --release `
+              no-asm
+          } else {
+            perl .\Configure ${{ matrix.platform.target }} `
+              --prefix=$Env:TONGSUO_HOME `
+              no-capieng no-makedepend `
+              enable-weak-ssl-ciphers enable-ntls no-shared --release
+          }
           
           Write-Host "Building..."
           nmake /S
@@ -560,20 +568,21 @@ jobs:
         run: |
           cd ${{ github.workspace }}\Tongsuo
           
-          # Set configuration args
-          $configArgs = ""
+          # Build configure command based on architecture
           if ("${{ matrix.platform.arch }}" -eq "arm64") {
-            $configArgs = "no-asm"
             Write-Host "Configuring ${{ matrix.platform.target }} (dynamic, ARM64 cross-compilation)..."
+            perl .\Configure ${{ matrix.platform.target }} `
+              --prefix=$Env:TONGSUO_HOME `
+              no-capieng no-makedepend `
+              enable-weak-ssl-ciphers enable-ntls --release `
+              no-asm
           } else {
             Write-Host "Configuring ${{ matrix.platform.target }} (dynamic)..."
+            perl .\Configure ${{ matrix.platform.target }} `
+              --prefix=$Env:TONGSUO_HOME `
+              no-capieng no-makedepend `
+              enable-weak-ssl-ciphers enable-ntls --release
           }
-          
-          perl .\Configure ${{ matrix.platform.target }} `
-            --prefix=$Env:TONGSUO_HOME `
-            no-capieng no-makedepend `
-            enable-weak-ssl-ciphers enable-ntls --release `
-            $configArgs
           
           Write-Host "Building..."
           nmake /S
