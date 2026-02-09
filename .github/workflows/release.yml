@@ -89,6 +89,16 @@ jobs:
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
+        continue-on-error: true
+        id: download_artifact
+
+      - name: Clone Tongsuo Directly (Fallback for Windows)
+        if: steps.download_artifact.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          repository: Tongsuo-Project/Tongsuo
+          ref: ${{ env.TONGSUO_VERSION }}
+          path: Tongsuo
 
       # --- Build C Lib (Unix) ---
       - name: Build Tongsuo C Lib (Unix)
@@ -258,6 +268,16 @@ jobs:
         with:
           name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
+        continue-on-error: true
+        id: download_artifact
+
+      - name: Clone Tongsuo Directly (Fallback for Windows)
+        if: steps.download_artifact.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          repository: Tongsuo-Project/Tongsuo
+          ref: ${{ env.TONGSUO_VERSION }}
+          path: Tongsuo
 
       # --- Build C Lib (Dynamic) ---
       - name: Build Tongsuo C Lib (Unix Dynamic)

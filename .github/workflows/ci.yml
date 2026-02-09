@@ -19,7 +19,7 @@ permissions:
 
 env:
   # Define the Tongsuo reference version once
-  TONGSUO_REF: 8.4-stable
+  TONGSUO_VERSION: 8.4-stable
 
 jobs:
   # ==================================================================================
@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Tongsuo-Project/Tongsuo
-          ref: ${{ env.TONGSUO_REF }}
+          ref: ${{ env.TONGSUO_VERSION }}
           path: Tongsuo
 
       - name: Archive Tongsuo Source
@@ -84,8 +84,18 @@ jobs:
       - name: Download Tongsuo Source
         uses: actions/download-artifact@v4
         with:
-          name: tongsuo-source
+          name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
+        continue-on-error: true
+        id: download_artifact
+
+      - name: Clone Tongsuo Directly (Fallback for Windows)
+        if: steps.download_artifact.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          repository: Tongsuo-Project/Tongsuo
+          ref: ${{ env.TONGSUO_VERSION }}
+          path: Tongsuo
 
       # -----------------------------------------------------------
       # Build Tongsuo C Lib (Unix: Linux / macOS)
@@ -234,8 +244,18 @@ jobs:
       - name: Download Tongsuo Source
         uses: actions/download-artifact@v4
         with:
-          name: tongsuo-source
+          name: tongsuo-src
           path: ${{ github.workspace }}/Tongsuo
+        continue-on-error: true
+        id: download_artifact
+
+      - name: Clone Tongsuo Directly (Fallback for Windows)
+        if: steps.download_artifact.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          repository: Tongsuo-Project/Tongsuo
+          ref: ${{ env.TONGSUO_VERSION }}
+          path: Tongsuo
 
       # -----------------------------------------------------------
       # Build Tongsuo C Lib (Unix Dynamic)
