@@ -16,6 +16,9 @@ on:
         required: true
         default: '1.1.0'
 
+permissions:
+  contents: write
+
 env:
   TONGSUO_VERSION: 8.4-stable
 
