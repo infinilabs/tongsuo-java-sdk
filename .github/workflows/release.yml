@@ -224,6 +224,9 @@ jobs:
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
+          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            GRADLE_ARGS="-Parch=arm64"
+          fi
           
           echo "Building JAR..."
           $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
@@ -241,6 +244,9 @@ jobs:
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
+          fi
+          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            GRADLE_ARGS="-Parch=arm64"
           fi
           
           # Add Tongsuo bin/lib to PATH for Windows tests

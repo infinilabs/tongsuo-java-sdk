@@ -196,6 +196,11 @@ jobs:
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
+
+          # Add arch parameter for Windows ARM64
+          if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            GRADLE_ARGS="-Parch=arm64"
+          fi
           
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
