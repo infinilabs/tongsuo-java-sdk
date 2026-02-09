@@ -67,17 +67,29 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation for macOS x86_64 on ARM runners with Rosetta 2
-          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-             echo "CC=clang -arch x86_64" >> $GITHUB_ENV
-             echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
-             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
-             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
-             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
-             # Ensure Gradle also picks up the architecture flags
-             echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
-             echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
-             echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
+          # Set architecture-specific flags for macOS
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+              # Cross-compilation for x86_64 on ARM runners with Rosetta 2
+              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
+              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+              echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
+            elif [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+              # Native ARM64 build - explicitly set arm64 architecture
+              echo "CC=clang -arch arm64" >> $GITHUB_ENV
+              echo "CXX=clang++ -arch arm64" >> $GITHUB_ENV
+              echo "CFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "CXXFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "LDFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_ldFlags=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cFlags=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cppFlags=-arch arm64" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
@@ -189,6 +201,9 @@ jobs:
             CONFIG_TARGET="mingw64"
             CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
+            # Set resource compiler for ARM64
+            export RC="aarch64-w64-mingw32-windres"
+            export WINDRES="aarch64-w64-mingw32-windres"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
             # Remove --strict-warnings to avoid -Werror issues with clang
@@ -394,17 +409,29 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation for macOS x86_64 on ARM runners with Rosetta 2
-          if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
-             echo "CC=clang -arch x86_64" >> $GITHUB_ENV
-             echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
-             echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
-             echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
-             echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
-             # Ensure Gradle also picks up the architecture flags
-             echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
-             echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
-             echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
+          # Set architecture-specific flags for macOS
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
+              # Cross-compilation for x86_64 on ARM runners with Rosetta 2
+              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
+              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+              echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
+            elif [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
+              # Native ARM64 build - explicitly set arm64 architecture
+              echo "CC=clang -arch arm64" >> $GITHUB_ENV
+              echo "CXX=clang++ -arch arm64" >> $GITHUB_ENV
+              echo "CFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "CXXFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "LDFLAGS=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_ldFlags=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cFlags=-arch arm64" >> $GITHUB_ENV
+              echo "ORG_GRADLE_PROJECT_cppFlags=-arch arm64" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
@@ -498,6 +525,9 @@ jobs:
             CONFIG_TARGET="mingw64"
             CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32- no-asm"
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
+            # Set resource compiler for ARM64
+            export RC="aarch64-w64-mingw32-windres"
+            export WINDRES="aarch64-w64-mingw32-windres"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
             # Remove --strict-warnings to avoid -Werror issues with clang
