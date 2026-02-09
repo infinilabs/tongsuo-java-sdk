@@ -411,6 +411,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
+        # Skip for Windows ARM64 (no JAR built)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         uses: actions/upload-artifact@v6
         with:
           name: jar-static-${{ matrix.platform.target }}
@@ -791,6 +793,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
+        # Skip for Windows ARM64 (no JAR built)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         uses: actions/upload-artifact@v6
         with:
           name: jar-dynamic-${{ matrix.platform.target }}
@@ -861,11 +865,12 @@ jobs:
           name: jar-dynamic-VC-WIN64A
           path: uber-jar-work/jars/
 
-      - name: Download Windows ARM64 Dynamic JAR
-        uses: actions/download-artifact@v7
-        with:
-          name: jar-dynamic-VC-WIN64-ARM
-          path: uber-jar-work/jars/
+      # Windows ARM64 JAR not available (cross-compilation limitations)
+      # - name: Download Windows ARM64 Dynamic JAR
+      #   uses: actions/download-artifact@v7
+      #   with:
+      #     name: jar-dynamic-VC-WIN64-ARM
+      #     path: uber-jar-work/jars/
 
       - name: Extract and Merge Native Libraries
         run: |
