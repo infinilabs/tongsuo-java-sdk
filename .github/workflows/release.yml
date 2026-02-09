@@ -76,6 +76,10 @@ jobs:
              echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
+             # Ensure Gradle also picks up the architecture flags
+             echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
+             echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
+             echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
              echo "Configuring cross-compilation for x86_64..."
           fi
 
@@ -165,12 +169,25 @@ jobs:
           # Fix permissions
           chmod +x Configure config
           
-          echo "Configuring ${{ matrix.platform.target }}..."
-          ./Configure ${{ matrix.platform.target }} \
+          # Determine configuration target
+          CONFIG_TARGET="${{ matrix.platform.target }}"
+          CONFIG_ARGS=""
+          
+          # For Windows ARM64 cross-compilation on Linux, use mingw64
+          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            CONFIG_TARGET="mingw64"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32-"
+            export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
+            echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
+          fi
+          
+          echo "Configuring ${CONFIG_TARGET}..."
+          ./Configure ${CONFIG_TARGET} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
             --strict-warnings --release -fstack-protector-strong \
-            enable-weak-ssl-ciphers enable-ntls no-shared
+            enable-weak-ssl-ciphers enable-ntls no-shared \
+            ${CONFIG_ARGS}
           
           echo "Building..."
           make -s -j4
@@ -360,8 +377,11 @@ jobs:
              echo "CFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "CXXFLAGS=-arch x86_64" >> $GITHUB_ENV
              echo "LDFLAGS=-arch x86_64" >> $GITHUB_ENV
+             # Ensure Gradle also picks up the architecture flags
+             echo "ORG_GRADLE_PROJECT_ldFlags=-arch x86_64" >> $GITHUB_ENV
+             echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
+             echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
           fi
-          echo "Rosetta 2 is available"
 
       - name: Set up Rosetta 2 for x86_64 emulation (macOS)
         if: runner.os == 'macOS' && matrix.platform.use_qemu == true
@@ -420,12 +440,25 @@ jobs:
           # Fix permissions
           chmod +x Configure config
           
-          echo "Configuring ${{ matrix.platform.target }} (dynamic)..."
-          ./Configure ${{ matrix.platform.target }} \
+          # Determine configuration target
+          CONFIG_TARGET="${{ matrix.platform.target }}"
+          CONFIG_ARGS=""
+          
+          # For Windows ARM64 cross-compilation on Linux, use mingw64
+          if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
+            CONFIG_TARGET="mingw64"
+            CONFIG_ARGS="--cross-compile-prefix=aarch64-w64-mingw32-"
+            export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
+            echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
+          fi
+          
+          echo "Configuring ${CONFIG_TARGET} (dynamic)..."
+          ./Configure ${CONFIG_TARGET} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
             --strict-warnings --release \
-            enable-weak-ssl-ciphers enable-ntls
+            enable-weak-ssl-ciphers enable-ntls \
+            ${CONFIG_ARGS}
           
           echo "Building..."
           make -s -j4
