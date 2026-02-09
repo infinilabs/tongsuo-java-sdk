@@ -206,7 +206,8 @@ jobs:
           # For Windows ARM64, build libs first (apps will fail due to resource file issue, but libs are OK)
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             # Build only crypto and ssl libraries, not programs
-            make -j4 build_generated libcrypto.a libssl.a 2>&1 || true
+            # Make will automatically generate required headers
+            make -j4 libcrypto.a libssl.a
             # Check if libraries were built successfully
             if [[ -f libcrypto.a && -f libssl.a ]]; then
               echo "✅ Libraries built successfully"
@@ -528,7 +529,8 @@ jobs:
           # For Windows ARM64, use static libs (DLL has resource file issues)
           if [[ "${{ matrix.platform.cross_compile }}" == "true" && "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             # Build only crypto and ssl libraries, not programs
-            make -j4 build_generated libcrypto.a libssl.a 2>&1 || true
+            # Make will automatically generate required headers
+            make -j4 libcrypto.a libssl.a
             # Check if libraries were built successfully
             if [[ -f libcrypto.a && -f libssl.a ]]; then
               echo "✅ Libraries built successfully"
