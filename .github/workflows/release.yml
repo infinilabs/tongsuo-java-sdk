@@ -189,7 +189,6 @@ jobs:
 
       # --- Build Java SDK ---
       - name: Setup Gradle Repository Override
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           # Create init.gradle to override repositories with official Maven Central
@@ -212,8 +211,6 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
-        # Skip Java SDK build for Windows ARM64
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -229,8 +226,6 @@ jobs:
           $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
-        # Skip Java SDK build for Windows ARM64
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -253,11 +248,6 @@ jobs:
           
           $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
-      - name: Note for Windows ARM64
-        if: matrix.platform.target == 'VC-WIN64-ARM'
-        shell: bash
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ Tongsuo C library built successfully for ARM64"
@@ -265,7 +255,6 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Static JAR
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
@@ -297,7 +286,6 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         uses: actions/upload-artifact@v6
         with:
           name: jar-static-${{ matrix.platform.target }}
@@ -457,7 +445,6 @@ jobs:
 
       # --- Build Java SDK ---
       - name: Setup Gradle Repository Override
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           # Create init.gradle to override repositories with official Maven Central
@@ -480,8 +467,6 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
-        # Skip Java SDK build for Windows ARM64
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -503,8 +488,6 @@ jobs:
           $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Gradle Test
-        # Skip Java SDK build for Windows ARM64
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -526,11 +509,6 @@ jobs:
           echo "Running Gradle Test..."
           $GRADLE_CMD test -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
-      - name: Note for Windows ARM64
-        if: matrix.platform.target == 'VC-WIN64-ARM'
-        shell: bash
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ Tongsuo C library built successfully for ARM64"
@@ -538,7 +516,6 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Dynamic JAR
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           cd openjdk/build/libs/
@@ -571,7 +548,6 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
-        if: matrix.platform.target != 'VC-WIN64-ARM'
         uses: actions/upload-artifact@v6
         with:
           name: jar-dynamic-${{ matrix.platform.target }}
@@ -640,6 +616,12 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: jar-dynamic-VC-WIN64A
+          path: uber-jar-work/jars/
+
+      - name: Download Windows ARM64 Dynamic JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-dynamic-VC-WIN64-ARM
           path: uber-jar-work/jars/
 
       - name: Extract and Merge Native Libraries
@@ -742,6 +724,7 @@ jobs:
             - ✅ macOS x64
             - ✅ macOS ARM64
             - ✅ Windows x64
+            - ✅ Windows ARM64
             
             **Usage:**
             ```xml
