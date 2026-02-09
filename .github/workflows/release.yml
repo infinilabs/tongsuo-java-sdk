@@ -174,14 +174,18 @@ jobs:
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
+            # Remove --strict-warnings to avoid -Werror issues with clang
+            STRICT_WARNINGS=""
             echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
+          else
+            STRICT_WARNINGS="--strict-warnings"
           fi
           
           echo "Configuring ${CONFIG_TARGET}..."
           ./Configure ${CONFIG_TARGET} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
-            --strict-warnings --release -fstack-protector-strong \
+            ${STRICT_WARNINGS} --release -fstack-protector-strong \
             enable-weak-ssl-ciphers enable-ntls no-shared \
             ${CONFIG_ARGS}
           
@@ -447,14 +451,18 @@ jobs:
             export CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0A00"
             # Clear CC to prevent double-prefix (Configure will add prefix automatically)
             unset CC CXX AR RANLIB
+            # Remove --strict-warnings to avoid -Werror issues with clang
+            STRICT_WARNINGS=""
             echo "Using mingw64 configuration for Windows ARM64 cross-compilation"
+          else
+            STRICT_WARNINGS="--strict-warnings"
           fi
           
           echo "Configuring ${CONFIG_TARGET} (dynamic)..."
           ./Configure ${CONFIG_TARGET} \
             --prefix=$TONGSUO_HOME \
             --libdir=$TONGSUO_HOME/lib \
-            --strict-warnings --release \
+            ${STRICT_WARNINGS} --release \
             enable-weak-ssl-ciphers enable-ntls \
             ${CONFIG_ARGS}
           
