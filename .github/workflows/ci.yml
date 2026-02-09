@@ -359,10 +359,14 @@ jobs:
           # Add Tongsuo to PATH for Windows
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+            # Convert Unix-style path to Windows-style for Gradle
+            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+            TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
           
           echo "Running Gradle check with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build
         if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true
@@ -709,6 +713,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
+        # Skip Java SDK build for Windows ARM64 (cross-compilation issues)
+        if: matrix.platform.target != 'VC-WIN64-ARM'
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -724,18 +730,20 @@ jobs:
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           
-          # For macOS ARM64, explicitly set arm64 architecture
-          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
-          fi
+          # For macOS ARM64, let it build natively (no special flags needed)
+          # The JDK and toolchain will be ARM64 by default on macos-14
           
           # Windows Path
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+            # Convert Unix-style path to Windows-style for Gradle
+            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+            TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
           
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Verify Windows ARM64 Build (Dynamic)
         if: matrix.platform.target == 'VC-WIN64-ARM' && matrix.platform.cross_compile == true

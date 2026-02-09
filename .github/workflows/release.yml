@@ -325,13 +325,18 @@ jobs:
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           
-          # For macOS ARM64, explicitly set arm64 architecture
-          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
+          # For macOS ARM64, let it build natively (no special flags needed)
+          # The JDK and toolchain will be ARM64 by default on macos-14
+          
+          # Convert path to Windows format if needed
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+            TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
           
           echo "Building JAR with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Gradle Test
         # Skip Java SDK build for Windows ARM64
@@ -348,10 +353,8 @@ jobs:
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           
-          # For macOS ARM64, explicitly set arm64 architecture
-          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
-          fi
+          # For macOS ARM64, let it build natively (no special flags needed)
+          # The JDK and toolchain will be ARM64 by default on macos-14
           
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
@@ -360,10 +363,14 @@ jobs:
           # Add Tongsuo bin/lib to PATH for Windows tests
           if [[ "${{ runner.os }}" == "Windows" ]]; then
              export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+             # Convert path to Windows format for Gradle
+             TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+             TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
           fi
           
           echo "Running tests with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD test -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
           echo "⚠️  Windows ARM64 - C Library Only"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -687,10 +694,8 @@ jobs:
             GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
           
-          # For macOS ARM64, explicitly set arm64 architecture
-          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
-          fi
+          # For macOS ARM64, let it build natively (no special flags needed)
+          # The JDK and toolchain will be ARM64 by default on macos-14
           
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -699,8 +704,16 @@ jobs:
              export DYLD_LIBRARY_PATH=$TONGSUO_HOME/lib:$DYLD_LIBRARY_PATH
           fi
           
+          # Convert path to Windows format if needed
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH=$TONGSUO_HOME/bin:$TONGSUO_HOME/lib:$PATH
+            TONGSUO_HOME_GRADLE=$(cygpath -w "$TONGSUO_HOME" 2>/dev/null || echo "$TONGSUO_HOME" | sed 's|^/\([a-z]\)/|\1:/|; s|/|\\|g')
+          else
+            TONGSUO_HOME_GRADLE="$TONGSUO_HOME"
+          fi
+          
           echo "Running Gradle Assemble with args: $GRADLE_ARGS..."
-          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          eval $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
       - name: Gradle Test
         # Skip Java SDK build for Windows ARM64
@@ -717,10 +730,8 @@ jobs:
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           
-          # For macOS ARM64, explicitly set arm64 architecture
-          if [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-            GRADLE_ARGS="-Parch=arm64 -PldFlags=\"-arch arm64\" -PcFlags=\"-arch arm64\" -PcppFlags=\"-arch arm64\""
-          fi
+          # For macOS ARM64, let it build natively (no special flags needed)
+          # The JDK and toolchain will be ARM64 by default on macos-14
           
           # Set runtime library paths for dynamic linking
           if [[ "${{ runner.os }}" == "Linux" ]]; then
