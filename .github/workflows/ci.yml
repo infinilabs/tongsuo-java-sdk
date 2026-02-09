@@ -54,10 +54,10 @@ jobs:
         platform:
           - { os: ubuntu-24.04,     target: linux-x86_64,      name: Linux-x64 }
           - { os: ubuntu-24.04-arm, target: linux-aarch64,     name: Linux-ARM64 }
-          - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64 }
+          - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64,    name: macOS-ARM64 }
           - { os: windows-latest,   target: VC-WIN64A,         name: Windows-x64 }
-          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64 }
+          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64, use_qemu: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 30
     
@@ -67,13 +67,34 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation for macOS x86_64 on ARM runners
+          # Cross-compilation for macOS x86_64 on ARM runners with Rosetta 2
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
           fi
 
-      - name: Set up JDK 11
+      - name: Set up Rosetta 2 for x86_64 emulation (macOS)
+        if: runner.os == 'macOS' && matrix.platform.use_qemu == true
+        shell: bash
+        run: |
+          # Rosetta 2 is already installed on macOS ARM runners
+          # Verify it's available
+          if ! arch -x86_64 uname -m; then
+            echo "Installing Rosetta 2..."
+            softwareupdate --install-rosetta --agree-to-license
+          fi
+          echo "Rosetta 2 is available"
+
+      - name: Set up JDK 11 (x86_64 for macOS x64)
+        if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          architecture: x64
+
+      - name: Set up JDK 11 (default)
+        if: "!(runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64')"
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -162,15 +183,22 @@ jobs:
         shell: bash
         run: |
           GRADLE_ARGS=""
+          GRADLE_CMD="./gradlew"
           
-          # Add arch parameter for macOS x86_64 cross-compilation
+          # For macOS x86_64 on ARM, use Rosetta 2 to run x86_64 JDK
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
             GRADLE_ARGS="-Parch=x86_64"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
           fi
 
-          # Add arch parameter for Windows ARM64
+          # For Windows ARM64, skip tests (no ARM64 Windows runner available)
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
+            echo "⚠️ Skipping tests for Windows ARM64 - no native ARM64 Windows runners available"
+            echo "Running assemble only..."
+            $GRADLE_CMD assemble -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+            exit 0
           fi
           
           # Add Tongsuo to PATH for Windows
@@ -179,7 +207,7 @@ jobs:
           fi
           
           echo "Running Gradle check..."
-          ./gradlew check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD check -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Build Test JAR (Linux x64 Only)
         if: matrix.platform.target == 'linux-x86_64'
@@ -219,10 +247,10 @@ jobs:
         platform:
           - { os: ubuntu-24.04,     target: linux-x86_64,      name: Linux-x64 }
           - { os: ubuntu-24.04-arm, target: linux-aarch64,     name: Linux-ARM64 }
-          - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64 }
+          - { os: macos-14,         target: darwin64-x86_64,   name: macOS-x64, use_qemu: true }
           - { os: macos-14,         target: darwin64-arm64,    name: macOS-ARM64 }
           - { os: windows-latest,   target: VC-WIN64A,         name: Windows-x64 }
-          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64 }
+          - { os: windows-latest,   target: VC-WIN64-ARM,      name: Windows-ARM64, use_qemu: true }
     runs-on: ${{ matrix.platform.os }}
     timeout-minutes: 30
     
@@ -232,13 +260,34 @@ jobs:
         run: |
           echo "TONGSUO_HOME=${{ runner.temp }}/tongsuo" >> $GITHUB_ENV
           
-          # Cross-compilation for macOS x86_64 on ARM runners
+          # Cross-compilation for macOS x86_64 on ARM runners with Rosetta 2
           if [[ "${{ runner.os }}" == "macOS" && "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
              echo "CC=clang -arch x86_64" >> $GITHUB_ENV
              echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
           fi
 
-      - name: Set up JDK 11
+      - name: Set up Rosetta 2 for x86_64 emulation (macOS)
+        if: runner.os == 'macOS' && matrix.platform.use_qemu == true
+        shell: bash
+        run: |
+          # Rosetta 2 is already installed on macOS ARM runners
+          # Verify it's available
+          if ! arch -x86_64 uname -m; then
+            echo "Installing Rosetta 2..."
+            softwareupdate --install-rosetta --agree-to-license
+          fi
+          echo "Rosetta 2 is available"
+
+      - name: Set up JDK 11 (x86_64 for macOS x64)
+        if: runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          architecture: x64
+
+      - name: Set up JDK 11 (default)
+        if: "!(runner.os == 'macOS' && matrix.platform.target == 'darwin64-x86_64')"
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -335,19 +384,22 @@ jobs:
         run: |
           GRADLE_ARGS=""
           TASK="check"
+          GRADLE_CMD="./gradlew"
           
-          # MacOS x86_64 cross-compile setup
+          # MacOS x86_64: Use Rosetta 2 to run x86_64 JDK and tests
           if [[ "${{ matrix.platform.target }}" == "darwin64-x86_64" ]]; then
             GRADLE_ARGS="-Parch=x86_64"
-            TASK="assemble"
-            echo "⚠️ Skipping tests for macOS x86_64 (Cross-compilation)"
+            # Run Gradle under Rosetta 2 for x86_64 emulation
+            GRADLE_CMD="arch -x86_64 ./gradlew"
+            TASK="check"
+            echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
 
           # Windows ARM64: Cannot run tests on x64 runner, only build
           if [[ "${{ matrix.platform.target }}" == "VC-WIN64-ARM" ]]; then
             GRADLE_ARGS="-Parch=arm64"
             TASK="assemble"
-            echo "⚠️ Skipping tests for Windows ARM64 (Cross-compilation)"
+            echo "⚠️ Skipping tests for Windows ARM64 - no native ARM64 Windows runners available"
           fi
           
           # Windows Path
@@ -356,7 +408,7 @@ jobs:
           fi
           
           echo "Running Gradle $TASK..."
-          ./gradlew $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
+          $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome=$TONGSUO_HOME $GRADLE_ARGS
 
       - name: Build Test JAR with Dynamic Lib Dep (Linux x64 Only)
         if: runner.os != 'Windows'
