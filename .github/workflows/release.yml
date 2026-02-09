@@ -64,6 +64,34 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Show System Architecture
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "System Architecture Information"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Platform target: ${{ matrix.platform.target }}"
+          echo ""
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "macOS Architecture (uname -m): $(uname -m)"
+            echo "macOS Architecture (arch): $(arch)"
+            echo "Available architectures:"
+            lipo -info $(which clang) 2>/dev/null || echo "  clang: $(file $(which clang))"
+            echo ""
+            echo "Java version and architecture:"
+            java -version 2>&1
+            file $(which java)
+          elif [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "Linux Architecture (uname -m): $(uname -m)"
+            echo "CPU info:"
+            lscpu | grep -E "Architecture|Model name" || true
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "Windows Architecture:"
+            systeminfo | findstr /B /C:"System Type" || echo "N/A"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Setup Environment Variables
         shell: bash
         run: |
@@ -83,16 +111,8 @@ jobs:
               echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
               echo "Configuring cross-compilation for x86_64..."
             elif [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-              # Native ARM64 build - explicitly set arm64 architecture
-              echo "CC=clang -arch arm64" >> $GITHUB_ENV
-              echo "CXX=clang++ -arch arm64" >> $GITHUB_ENV
-              echo "CFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "CXXFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "LDFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_ldFlags=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_cFlags=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_cppFlags=-arch arm64" >> $GITHUB_ENV
-              echo "Configuring native ARM64 build..."
+              # Native ARM64 build - macos-14 is ARM64 by default, no flags needed
+              echo "Building natively for ARM64"
             fi
           fi
 
@@ -412,6 +432,34 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Show System Architecture
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "System Architecture Information"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Platform target: ${{ matrix.platform.target }}"
+          echo ""
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "macOS Architecture (uname -m): $(uname -m)"
+            echo "macOS Architecture (arch): $(arch)"
+            echo "Available architectures:"
+            lipo -info $(which clang) 2>/dev/null || echo "  clang: $(file $(which clang))"
+            echo ""
+            echo "Java version and architecture:"
+            java -version 2>&1
+            file $(which java)
+          elif [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "Linux Architecture (uname -m): $(uname -m)"
+            echo "CPU info:"
+            lscpu | grep -E "Architecture|Model name" || true
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "Windows Architecture:"
+            systeminfo | findstr /B /C:"System Type" || echo "N/A"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Setup Environment Variables
         shell: bash
         run: |
@@ -430,15 +478,8 @@ jobs:
               echo "ORG_GRADLE_PROJECT_cFlags=-arch x86_64" >> $GITHUB_ENV
               echo "ORG_GRADLE_PROJECT_cppFlags=-arch x86_64" >> $GITHUB_ENV
             elif [[ "${{ matrix.platform.target }}" == "darwin64-arm64" ]]; then
-              # Native ARM64 build - explicitly set arm64 architecture
-              echo "CC=clang -arch arm64" >> $GITHUB_ENV
-              echo "CXX=clang++ -arch arm64" >> $GITHUB_ENV
-              echo "CFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "CXXFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "LDFLAGS=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_ldFlags=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_cFlags=-arch arm64" >> $GITHUB_ENV
-              echo "ORG_GRADLE_PROJECT_cppFlags=-arch arm64" >> $GITHUB_ENV
+              # Native ARM64 build - macos-14 is ARM64 by default, no flags needed
+              echo "Building natively for ARM64"
             fi
           fi
 
