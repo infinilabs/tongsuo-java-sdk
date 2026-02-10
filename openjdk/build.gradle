@@ -260,9 +260,20 @@ publishing.publications.maven {
 }
 
 jar.manifest {
+    def gitCommit = 'git rev-parse --short HEAD'.execute().text.trim() ?: 'unknown'
+    def gitBranch = 'git rev-parse --abbrev-ref HEAD'.execute().text.trim() ?: 'unknown'
+    def buildTime = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone("UTC"))
+    
     attributes ('Automatic-Module-Name' : 'org.conscrypt',
                 'Bundle-SymbolicName': 'org.conscrypt',
-                '-exportcontents': 'org.conscrypt.*')
+                '-exportcontents': 'org.conscrypt.*',
+                'Implementation-Title': 'Tongsuo Java SDK',
+                'Implementation-Version': "${version}",
+                'Implementation-Vendor': 'Tongsuo',
+                'Build-Time': buildTime,
+                'Git-Commit': gitCommit,
+                'Git-Branch': gitBranch,
+                'Build-Jdk': System.getProperty('java.version'))
 }
 
 dependencies {
@@ -523,11 +534,137 @@ model {
                 // Everything under will be included in the native jar.
                 into nativeBuild.jarNativeResourcesDir()
             }
+            
+            // For dynamic builds, also copy Tongsuo shared libraries
+            if (nativeBuild.buildType == BuildType.DYNAMIC) {
+                def copyTongsuoLibsTask = project.tasks.register("copyTongsuoLibs${classifier}", Copy) {
+                    dependsOn binary.tasks.link
+                    
+                    def tongsuoHome = System.getenv('TONGSUO_HOME')
+                    if (tongsuoHome && new File(tongsuoHome).exists()) {
+                        def tongsuoLibDir = new File(tongsuoHome, 'lib')
+                        if (tongsuoLibDir.exists()) {
+                            from tongsuoLibDir
+                            into nativeBuild.jarNativeResourcesDir()
+                            
+                            // Platform-specific library patterns
+                            if (osdetector.os == 'osx') {
+                                include 'libssl*.dylib', 'libcrypto*.dylib'
+                            } else if (osdetector.os == 'linux') {
+                                include 'libssl.so*', 'libcrypto.so*'
+                            } else if (osdetector.os == 'windows') {
+                                from new File(tongsuoHome, 'bin')  // Windows DLLs are in bin/
+                                include 'libssl-*.dll', 'libcrypto-*.dll'
+                            }
+                            
+                            // Preserve symlinks and copy actual files
+                            duplicatesStrategy = DuplicatesStrategy.INCLUDE
+                        }
+                    }
+                }
+                
+                processResources {
+                    dependsOn copyTongsuoLibsTask
+                }
+                processTestResources {
+                    dependsOn copyTongsuoLibsTask
+                }
+                copyTask.configure {
+                    mustRunAfter copyTongsuoLibsTask
+                }
+            }
+            
             processResources {
                 dependsOn copyTask
             }
             processTestResources {
                 dependsOn copyTask
+            }
+
+            // Fix dynamic library paths (rpath) for macOS
+            if (osdetector.os == 'osx' && nativeBuild.buildType == BuildType.DYNAMIC) {
+                def fixRpathTask = binary.tasks.taskName("fixRpath")
+                project.tasks.register(fixRpathTask as String, Exec) {
+                    dependsOn binary.tasks.link
+                    
+                    doFirst {
+                        def libFile = binary.tasks.link.linkedFile.asFile.get()
+                        def tongsuoHome = System.getenv('TONGSUO_HOME')
+                        
+                        if (tongsuoHome) {
+                            // Change absolute paths to @rpath
+                            exec {
+                                executable "install_name_tool"
+                                args "-change", "${tongsuoHome}/lib/libssl.3.dylib", "@rpath/libssl.3.dylib", libFile
+                                ignoreExitValue = true
+                            }
+                            exec {
+                                executable "install_name_tool"
+                                args "-change", "${tongsuoHome}/lib/libcrypto.3.dylib", "@rpath/libcrypto.3.dylib", libFile
+                                ignoreExitValue = true
+                            }
+                            
+                            // Add @loader_path as rpath
+                            exec {
+                                executable "install_name_tool"
+                                args "-add_rpath", "@loader_path", libFile
+                                ignoreExitValue = true
+                            }
+                            exec {
+                                executable "install_name_tool"
+                                args "-add_rpath", "@loader_path/.", libFile
+                                ignoreExitValue = true
+                            }
+                            
+                            // Add system library paths
+                            exec {
+                                executable "install_name_tool"
+                                args "-add_rpath", "/usr/local/lib", libFile
+                                ignoreExitValue = true
+                            }
+                            exec {
+                                executable "install_name_tool"
+                                args "-add_rpath", "/opt/homebrew/lib", libFile
+                                ignoreExitValue = true
+                            }
+                        }
+                    }
+                }
+                copyTask.configure {
+                    dependsOn fixRpathTask
+                }
+            }
+            
+            // Fix dynamic library paths (rpath) for Linux
+            if (osdetector.os == 'linux' && nativeBuild.buildType == BuildType.DYNAMIC) {
+                def fixRpathTask = binary.tasks.taskName("fixRpath")
+                project.tasks.register(fixRpathTask as String, Exec) {
+                    dependsOn binary.tasks.link
+                    
+                    doFirst {
+                        def libFile = binary.tasks.link.linkedFile.asFile.get()
+                        
+                        // Check if patchelf is available
+                        try {
+                            exec {
+                                executable "which"
+                                args "patchelf"
+                            }
+                            
+                            // Set rpath to search in common locations
+                            exec {
+                                executable "patchelf"
+                                args "--set-rpath", '$ORIGIN:/usr/local/lib:/usr/lib:/lib', libFile
+                                ignoreExitValue = true
+                            }
+                        } catch (Exception e) {
+                            logger.warn("patchelf not found, skipping rpath fix for Linux")
+                        }
+                    }
+                }
+                copyTask.configure {
+                    dependsOn fixRpathTask
+                }
             }
 
             // Now define a task to strip the release binary (linux only)
