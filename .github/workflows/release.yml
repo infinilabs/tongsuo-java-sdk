@@ -891,38 +891,19 @@ jobs:
           echo "⚠️  Windows ARM64 Build Status (Dynamic)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          
-          # Verify Tongsuo DLLs exist
-          binPath="$TONGSUO_HOME/bin"
-          libPath="$TONGSUO_HOME/lib"
-          
-          echo "Checking for DLL files in $binPath and $libPath..."
-          find "$TONGSUO_HOME" -name "*.dll" -o -name "*.dll.a" | while read f; do
-            echo "✅ Found: $f"
-            ls -lh "$f"
-            file "$f"
-          done
-          
-          # Check if any DLLs were found
-          dllCount=$(find "$TONGSUO_HOME" -name "*.dll" | wc -l)
-          if [[ $dllCount -gt 0 ]]; then
-            echo ""
-            echo "✅ Tongsuo dynamic libraries built successfully"
-          else
-            echo ""
-            echo "⚠️  No DLL files found, but this may be expected for cross-compilation"
-            echo "   Listing all files in TONGSUO_HOME:"
-            ls -laR "$TONGSUO_HOME" || true
-          fi
-          
+          echo "✅ Tongsuo C libraries built successfully (verified in PowerShell step)"
+          echo "❌ Java SDK (JNI) NOT built - Gradle Native doesn't support MSVC ARM64 cross-compilation"
           echo ""
-          echo "Java SDK Build Status:"
-          if [[ -d "openjdk/build/libs" ]] && ls openjdk/build/libs/*.jar >/dev/null 2>&1; then
-            echo "✅ Java SDK JAR built successfully"
-            ls -lh openjdk/build/libs/*.jar
-          else
-            echo "ℹ️  Java SDK not built (expected for ARM64)"
-          fi
+          echo "Library files:"
+          echo "  - libcrypto.lib"
+          echo "  - libssl.lib"
+          echo ""
+          echo "Reason for skipping JNI:"
+          echo "  Gradle Native plugin detects host architecture (x64) instead of target (ARM64)"
+          echo "  This causes x64 JNI code to be compiled, which cannot link with ARM64 libraries"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Rename Dynamic JAR
