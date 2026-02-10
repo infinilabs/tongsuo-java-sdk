@@ -1138,22 +1138,19 @@ jobs:
           cd uber-jar-work/base
           
           # Create new MANIFEST.MF with all metadata
-          cat > META-INF/MANIFEST.MF << EOF
-Manifest-Version: 1.0
-Created-By: ${{ inputs.version }} (Tongsuo Project)
-Implementation-Title: Tongsuo Java SDK (Static Uber JAR)
-Implementation-Version: ${{ inputs.version }}
-Implementation-Vendor: Tongsuo Project
-Build-Time: ${BUILD_TIME}
-Git-Commit: ${GIT_COMMIT}
-Git-Branch: ${GIT_BRANCH}
-Build-Jdk: ${{ matrix.java-version || '11.0.30' }} (Eclipse Adoptium)
-Automatic-Module-Name: org.conscrypt
-Bundle-SymbolicName: org.conscrypt
-Jar-Type: uber-static
-Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64
-
-EOF
+          echo "Manifest-Version: 1.0" > META-INF/MANIFEST.MF
+          echo "Created-By: Tongsuo Project" >> META-INF/MANIFEST.MF
+          echo "Implementation-Title: Tongsuo Java SDK (Static Uber JAR)" >> META-INF/MANIFEST.MF
+          echo "Implementation-Version: ${{ inputs.version }}" >> META-INF/MANIFEST.MF
+          echo "Implementation-Vendor: Tongsuo Project" >> META-INF/MANIFEST.MF
+          echo "Build-Time: ${BUILD_TIME}" >> META-INF/MANIFEST.MF
+          echo "Git-Commit: ${GIT_COMMIT}" >> META-INF/MANIFEST.MF
+          echo "Git-Branch: ${GIT_BRANCH}" >> META-INF/MANIFEST.MF
+          echo "Build-Jdk: 11.0.30 (Eclipse Adoptium)" >> META-INF/MANIFEST.MF
+          echo "Automatic-Module-Name: org.conscrypt" >> META-INF/MANIFEST.MF
+          echo "Bundle-SymbolicName: org.conscrypt" >> META-INF/MANIFEST.MF
+          echo "Jar-Type: uber-static" >> META-INF/MANIFEST.MF
+          echo "Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64" >> META-INF/MANIFEST.MF
           
           echo "MANIFEST.MF created with:"
           cat META-INF/MANIFEST.MF
@@ -1357,22 +1354,19 @@ EOF
           cd uber-jar-work/base
           
           # Create new MANIFEST.MF with all metadata
-          cat > META-INF/MANIFEST.MF << EOF
-Manifest-Version: 1.0
-Created-By: ${{ inputs.version }} (Tongsuo Project)
-Implementation-Title: Tongsuo Java SDK (Dynamic Uber JAR)
-Implementation-Version: ${{ inputs.version }}
-Implementation-Vendor: Tongsuo Project
-Build-Time: ${BUILD_TIME}
-Git-Commit: ${GIT_COMMIT}
-Git-Branch: ${GIT_BRANCH}
-Build-Jdk: ${{ matrix.java-version || '11.0.30' }} (Eclipse Adoptium)
-Automatic-Module-Name: org.conscrypt
-Bundle-SymbolicName: org.conscrypt
-Jar-Type: uber-dynamic
-Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64
-
-EOF
+          echo "Manifest-Version: 1.0" > META-INF/MANIFEST.MF
+          echo "Created-By: Tongsuo Project" >> META-INF/MANIFEST.MF
+          echo "Implementation-Title: Tongsuo Java SDK (Dynamic Uber JAR)" >> META-INF/MANIFEST.MF
+          echo "Implementation-Version: ${{ inputs.version }}" >> META-INF/MANIFEST.MF
+          echo "Implementation-Vendor: Tongsuo Project" >> META-INF/MANIFEST.MF
+          echo "Build-Time: ${BUILD_TIME}" >> META-INF/MANIFEST.MF
+          echo "Git-Commit: ${GIT_COMMIT}" >> META-INF/MANIFEST.MF
+          echo "Git-Branch: ${GIT_BRANCH}" >> META-INF/MANIFEST.MF
+          echo "Build-Jdk: 11.0.30 (Eclipse Adoptium)" >> META-INF/MANIFEST.MF
+          echo "Automatic-Module-Name: org.conscrypt" >> META-INF/MANIFEST.MF
+          echo "Bundle-SymbolicName: org.conscrypt" >> META-INF/MANIFEST.MF
+          echo "Jar-Type: uber-dynamic" >> META-INF/MANIFEST.MF
+          echo "Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64" >> META-INF/MANIFEST.MF
           
           echo "MANIFEST.MF created with:"
           cat META-INF/MANIFEST.MF
