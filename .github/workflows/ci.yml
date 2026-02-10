@@ -708,6 +708,71 @@ jobs:
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
+      - name: Fix Dynamic Library Paths (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Fixing macOS Dynamic Library Paths"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Find the JNI library
+          JNI_LIB=$(find openjdk/build/libs -name "libconscrypt_openjdk_jni.dylib" | head -1)
+          
+          if [ -n "$JNI_LIB" ]; then
+            echo "Found JNI library: $JNI_LIB"
+            echo ""
+            echo "Current dependencies:"
+            otool -L "$JNI_LIB"
+            echo ""
+            
+            # Change absolute paths to @rpath
+            install_name_tool -change "$TONGSUO_HOME/lib/libssl.3.dylib" "@rpath/libssl.3.dylib" "$JNI_LIB" || true
+            install_name_tool -change "$TONGSUO_HOME/lib/libcrypto.3.dylib" "@rpath/libcrypto.3.dylib" "$JNI_LIB" || true
+            
+            # Add @loader_path as rpath (search relative to the library itself)
+            install_name_tool -add_rpath "@loader_path" "$JNI_LIB" || true
+            install_name_tool -add_rpath "@loader_path/." "$JNI_LIB" || true
+            
+            # Add system library paths
+            install_name_tool -add_rpath "/usr/local/lib" "$JNI_LIB" || true
+            install_name_tool -add_rpath "/opt/homebrew/lib" "$JNI_LIB" || true
+            
+            echo "Fixed dependencies:"
+            otool -L "$JNI_LIB"
+            echo "✅ Dynamic library paths fixed"
+          else
+            echo "⚠️  No JNI library found (might be skipped for this platform)"
+          fi
+
+      - name: Fix Dynamic Library Paths (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Fixing Linux Dynamic Library Paths"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Find the JNI library
+          JNI_LIB=$(find openjdk/build/libs -name "libconscrypt_openjdk_jni.so" | head -1)
+          
+          if [ -n "$JNI_LIB" ]; then
+            echo "Found JNI library: $JNI_LIB"
+            echo ""
+            echo "Current dependencies:"
+            ldd "$JNI_LIB" || true
+            echo ""
+            
+            # Set rpath to search in common locations
+            patchelf --set-rpath '$ORIGIN:/usr/local/lib:/usr/lib:/lib' "$JNI_LIB" || true
+            
+            echo "Fixed dependencies:"
+            ldd "$JNI_LIB" || true
+            echo "✅ Dynamic library paths fixed"
+          else
+            echo "⚠️  No JNI library found (might be skipped for this platform)"
+          fi
+
       - name: Verify Windows ARM64 Build (Dynamic)
         if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
         shell: bash
