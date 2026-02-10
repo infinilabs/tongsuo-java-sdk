@@ -15,6 +15,11 @@ on:
         description: 'The version to build (e.g., 1.1.0)'
         required: true
         default: '1.1.0'
+      publish_release:
+        description: 'Publish release'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -1035,17 +1040,23 @@ jobs:
           # Extract native libraries from all JARs
           for jar in jars/*.jar; do
             echo "Extracting native libraries from $(basename $jar)..."
-            unzip -q "$jar" "org/conscrypt/native/*" -d temp/ 2>/dev/null || true
-            if [ -d temp/org/conscrypt/native ]; then
-              cp -r temp/org/conscrypt/native/* base/org/conscrypt/native/ 2>/dev/null || true
+            echo "  Checking contents..."
+            jar tf "$jar" | grep "META-INF/native" || echo "  No META-INF/native found"
+            unzip -q "$jar" "META-INF/native/*" -d temp/ 2>/dev/null || true
+            if [ -d temp/META-INF/native ]; then
+              echo "  Found native libs, copying to base..."
+              mkdir -p base/META-INF/native
+              cp -v temp/META-INF/native/* base/META-INF/native/ 2>/dev/null || true
               rm -rf temp
+            else
+              echo "  No native directory found after extraction"
             fi
           done
           
           # List all included native libraries
           echo ""
           echo "Included native libraries:"
-          find base/org/conscrypt/native -type f | sort
+          find base/META-INF/native -type f 2>/dev/null | sort || echo "  (none found)"
           
           # Create uber JAR
           echo ""
@@ -1059,21 +1070,21 @@ jobs:
           echo "Uber JAR created:"
           ls -lh tongsuo-openjdk-${{ inputs.version }}-uber.jar
           echo ""
-          echo "Contents:"
-          jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "org/conscrypt/native" | sort
+          echo "Native library contents:"
+          jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native" | sort
 
       - name: Verify Uber JAR
         run: |
           cd uber-jar-work
-          
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "Uber JAR Verification"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
-          # Count platforms
-          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "linux" || echo 0)
-          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "darwin\|osx" || echo 0)
-          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep -c "windows\|win" || echo 0)
+          # Count platforms by checking for native library files
+          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*linux" | wc -l | tr -d ' ')
+          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(darwin\|osx\)" | wc -l | tr -d ' ')
+          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(windows\|win\)" | wc -l | tr -d ' ')
           
           echo "Platform Coverage:"
           echo "  Linux libraries:   $LINUX_COUNT"
@@ -1081,18 +1092,21 @@ jobs:
           echo "  Windows libraries: $WINDOWS_COUNT"
           echo ""
           
-          # Expected minimum (may vary)
-          EXPECTED_MIN=4
+          # Expected: 5 platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64)
+          # Windows ARM64 is skipped due to Gradle Native limitations
+          EXPECTED_MIN=5
           TOTAL=$((LINUX_COUNT + DARWIN_COUNT + WINDOWS_COUNT))
           
           echo "Total native libraries: $TOTAL"
           echo "Expected minimum: $EXPECTED_MIN"
+          echo ""
           
           if [ $TOTAL -ge $EXPECTED_MIN ]; then
             echo "✅ Verification passed!"
           else
             echo "⚠️  Warning: Found fewer libraries than expected"
             echo "This might be OK if some platforms were skipped"
+            exit 0  # Don't fail the build
           fi
 
       - name: Upload Uber JAR Artifact
@@ -1104,6 +1118,7 @@ jobs:
 
       - name: Upload Uber JAR to Release
         uses: softprops/action-gh-release@v2
+        if: ${{ inputs.publish_release == true }}
         with:
           tag_name: ${{ inputs.version }}
           draft: true
