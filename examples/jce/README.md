@@ -113,17 +113,40 @@ We provide two uber JARs:
 
 ### Static Uber JAR (Recommended) ⭐
 - **Filename:** `tongsuo-openjdk-{version}-uber.jar`
-- **Pros:** No external dependencies, works out of the box
-- **Cons:** Larger file size (~15-20 MB)
-- **Use when:** You want simplicity and don't mind the file size
+- **Size:** ~15-20 MB
+- **Dependencies:** None - all Tongsuo libraries are statically linked
+- **Use when:** You want simplicity and portability
+- **Pros:** Works everywhere, no installation required
+- **Cons:** Larger file size
 
 ### Dynamic Uber JAR (Advanced)
 - **Filename:** `tongsuo-openjdk-{version}-dynamic-uber.jar`
-- **Pros:** Smaller file size (~1-2 MB)
-- **Cons:** Requires Tongsuo installed on your system
-- **Use when:** You have Tongsuo installed and want smaller JARs
+- **Size:** ~1-2 MB
+- **Dependencies:** **Requires Tongsuo installed on your system**
+- **Use when:** You have Tongsuo already installed system-wide
+- **Pros:** Much smaller file size, can use system-optimized libraries
+- **Cons:** Requires system setup
 
-**For most users, the static uber JAR is recommended.**
+#### Installing Tongsuo (for Dynamic Uber JAR)
+
+**macOS:**
+```bash
+brew install tongsuo
+# Or build from source and install to /usr/local
+```
+
+**Linux:**
+```bash
+# Install to /usr/local/lib
+sudo ldconfig  # Update library cache
+```
+
+**Windows:**
+```bash
+# Add Tongsuo bin/ directory to PATH
+```
+
+**For most users, the static uber JAR is recommended** as it requires no system setup.
 
 ## Troubleshooting
 
