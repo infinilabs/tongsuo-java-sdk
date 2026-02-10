@@ -65,6 +65,7 @@ jobs:
       - name: Show System Architecture
         shell: bash
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "System Architecture Information"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -333,25 +334,23 @@ jobs:
         if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
         shell: bash
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "⚠️  Windows ARM64 Build Status (Cross-compiled on Linux)"
+          echo "⚠️  Windows ARM64 Build Status"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
           
-          # Verify Tongsuo libraries exist
+          # Verify Tongsuo libraries exist (Windows uses .lib extension)
           libPath="$TONGSUO_HOME/lib"
-          libCrypto="$libPath/libcrypto.a"
-          libSsl="$libPath/libssl.a"
+          libCrypto="$libPath/libcrypto.lib"
+          libSsl="$libPath/libssl.lib"
           
           if [[ -f "$libCrypto" && -f "$libSsl" ]]; then
             echo "✅ Tongsuo C libraries built successfully:"
             ls -lh "$libCrypto"
             ls -lh "$libSsl"
-            
-            # Verify ARM64 architecture
             echo ""
-            echo "Library Architecture Verification:"
-            file "$libCrypto" "$libSsl"
+            echo "❌ Java SDK (JNI) NOT built - Gradle Native doesn't support MSVC ARM64 cross-compilation"
           else
             echo "❌ Tongsuo libraries not found at:"
             echo "   $libCrypto"
@@ -415,6 +414,7 @@ jobs:
       - name: Show System Architecture
         shell: bash
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "System Architecture Information"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -712,6 +712,7 @@ jobs:
         if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
         shell: bash
         run: |
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "⚠️  Windows ARM64 Build Status (Dynamic)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
