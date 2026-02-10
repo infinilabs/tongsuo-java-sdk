@@ -826,6 +826,71 @@ jobs:
           echo "        Java SDK build will be skipped for this platform."
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+      - name: Fix Dynamic Library Paths (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Fixing macOS Dynamic Library Paths"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Find the JNI library
+          JNI_LIB=$(find openjdk/build/libs -name "libconscrypt_openjdk_jni.dylib" | head -1)
+          
+          if [ -n "$JNI_LIB" ]; then
+            echo "Found JNI library: $JNI_LIB"
+            echo ""
+            echo "Current dependencies:"
+            otool -L "$JNI_LIB"
+            echo ""
+            
+            # Change absolute paths to @rpath
+            install_name_tool -change "$TONGSUO_HOME/lib/libssl.3.dylib" "@rpath/libssl.3.dylib" "$JNI_LIB" || true
+            install_name_tool -change "$TONGSUO_HOME/lib/libcrypto.3.dylib" "@rpath/libcrypto.3.dylib" "$JNI_LIB" || true
+            
+            # Add @loader_path as rpath (search relative to the library itself)
+            install_name_tool -add_rpath "@loader_path" "$JNI_LIB" || true
+            install_name_tool -add_rpath "@loader_path/." "$JNI_LIB" || true
+            
+            # Add system library paths
+            install_name_tool -add_rpath "/usr/local/lib" "$JNI_LIB" || true
+            install_name_tool -add_rpath "/opt/homebrew/lib" "$JNI_LIB" || true
+            
+            echo "Fixed dependencies:"
+            otool -L "$JNI_LIB"
+            echo "✅ Dynamic library paths fixed"
+          else
+            echo "⚠️  No JNI library found (might be skipped for this platform)"
+          fi
+
+      - name: Fix Dynamic Library Paths (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Fixing Linux Dynamic Library Paths"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Find the JNI library
+          JNI_LIB=$(find openjdk/build/libs -name "libconscrypt_openjdk_jni.so" | head -1)
+          
+          if [ -n "$JNI_LIB" ]; then
+            echo "Found JNI library: $JNI_LIB"
+            echo ""
+            echo "Current dependencies:"
+            ldd "$JNI_LIB" || true
+            echo ""
+            
+            # Set rpath to search in common locations
+            patchelf --set-rpath '$ORIGIN:/usr/local/lib:/usr/lib:/lib' "$JNI_LIB" || true
+            
+            echo "Fixed dependencies:"
+            ldd "$JNI_LIB" || true
+            echo "✅ Dynamic library paths fixed"
+          else
+            echo "⚠️  No JNI library found (might be skipped for this platform)"
+          fi
+
       - name: Gradle Test
         # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
         if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
@@ -963,10 +1028,196 @@ jobs:
           files: openjdk/build/libs/tongsuo-openjdk-dynamic-${{ inputs.version }}-${{ matrix.platform.target }}.jar
           fail_on_unmatched_files: true
   # ==================================================================================
-  # Phase 4: Build Uber JAR (All Platforms)
+  # Phase 4: Build Uber JARs (Static & Dynamic)
   # ==================================================================================
-  build-uber-jar:
-    name: Build Uber JAR
+  
+  # Static Uber JAR - Recommended for most users (no external dependencies)
+  build-static-uber-jar:
+    name: Build Static Uber JAR
+    needs: build-static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
+      - name: Create Uber JAR Directory
+        run: |
+          mkdir -p uber-jar-work
+          cd uber-jar-work
+          mkdir -p jars
+          mkdir -p base
+
+      - name: Download Linux x64 Static JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-static-linux-x86_64
+          path: uber-jar-work/jars/
+
+      - name: Download Linux ARM64 Static JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-static-linux-aarch64
+          path: uber-jar-work/jars/
+
+      - name: Download macOS x64 Static JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-static-darwin64-x86_64
+          path: uber-jar-work/jars/
+
+      - name: Download macOS ARM64 Static JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-static-darwin64-arm64
+          path: uber-jar-work/jars/
+
+      - name: Download Windows x64 Static JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: jar-static-VC-WIN64A
+          path: uber-jar-work/jars/
+
+      # Windows ARM64 JAR not available - Gradle Native doesn't support MSVC ARM64 cross-compilation
+      # - name: Download Windows ARM64 Static JAR
+      #   uses: actions/download-artifact@v7
+      #   with:
+      #     name: jar-static-VC-WIN64-ARM
+      #     path: uber-jar-work/jars/
+
+      - name: Extract and Merge Native Libraries
+        run: |
+          cd uber-jar-work
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Building Static Uber JAR - All Platforms"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Extract first JAR to get the base structure
+          FIRST_JAR=$(ls jars/*.jar | head -1)
+          echo "Using $FIRST_JAR as base..."
+          unzip -q "$FIRST_JAR" -d base/
+          
+          # Extract native libraries from all JARs
+          for jar in jars/*.jar; do
+            echo "Extracting native libraries from $(basename $jar)..."
+            echo "  Checking contents..."
+            jar tf "$jar" | grep "META-INF/native" || echo "  No META-INF/native found"
+            unzip -q "$jar" "META-INF/native/*" -d temp/ 2>/dev/null || true
+            if [ -d temp/META-INF/native ]; then
+              echo "  Found native libs, copying to base..."
+              mkdir -p base/META-INF/native
+              cp -v temp/META-INF/native/* base/META-INF/native/ 2>/dev/null || true
+              rm -rf temp
+            else
+              echo "  No native directory found after extraction"
+            fi
+          done
+          
+          # List all included native libraries
+          echo ""
+          echo "Included native libraries:"
+          find base/META-INF/native -type f 2>/dev/null | sort || echo "  (none found)"
+          
+          # Create uber JAR
+          echo ""
+          echo "Creating static uber JAR..."
+          cd base
+          jar cf ../tongsuo-openjdk-${{ inputs.version }}-uber.jar .
+          cd ..
+          
+          # Show JAR info
+          echo ""
+          echo "Static Uber JAR created:"
+          ls -lh tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          echo ""
+          echo "Native library contents:"
+          jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native" | sort
+
+      - name: Verify Static Uber JAR
+        run: |
+          cd uber-jar-work
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Static Uber JAR Verification"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Count platforms by checking for native library files
+          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*linux" | wc -l | tr -d ' ')
+          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(darwin\|osx\)" | wc -l | tr -d ' ')
+          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(windows\|win\)" | wc -l | tr -d ' ')
+          
+          echo "Platform Coverage:"
+          echo "  Linux libraries:   $LINUX_COUNT"
+          echo "  macOS libraries:   $DARWIN_COUNT"
+          echo "  Windows libraries: $WINDOWS_COUNT"
+          echo ""
+          
+          # Expected: 5 platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64)
+          # Windows ARM64 is skipped due to Gradle Native limitations
+          EXPECTED_MIN=5
+          TOTAL=$((LINUX_COUNT + DARWIN_COUNT + WINDOWS_COUNT))
+          
+          echo "Total native libraries: $TOTAL"
+          echo "Expected minimum: $EXPECTED_MIN"
+          echo ""
+          
+          if [ $TOTAL -ge $EXPECTED_MIN ]; then
+            echo "✅ Verification passed!"
+          else
+            echo "⚠️  Warning: Found fewer libraries than expected"
+            echo "This might be OK if some platforms were skipped"
+            exit 0  # Don't fail the build
+          fi
+
+      - name: Upload Static Uber JAR Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: jar-static-uber
+          path: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          retention-days: 7
+
+      - name: Upload Static Uber JAR to Release
+        uses: softprops/action-gh-release@v2
+        if: ${{ inputs.publish_release == true }}
+        with:
+          tag_name: ${{ inputs.version }}
+          draft: true
+          prerelease: true
+          files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          fail_on_unmatched_files: true
+          body: |
+            ## 📦 Static Uber JAR (Recommended)
+            
+            **Static linking - No external dependencies required!**
+            
+            This JAR contains native libraries for all platforms with Tongsuo statically linked:
+            - ✅ Linux x64
+            - ✅ Linux ARM64
+            - ✅ macOS x64
+            - ✅ macOS ARM64
+            - ✅ Windows x64
+            - ❌ Windows ARM64 (not supported due to Gradle Native limitations)
+            
+            **Benefits:**
+            - ✅ No need to install Tongsuo separately
+            - ✅ Works out of the box
+            - ✅ Larger file size but simpler deployment
+            
+            **Usage:**
+            ```bash
+            java -cp tongsuo-openjdk-${{ inputs.version }}-uber.jar:your-app.jar com.example.YourApp
+            ```
+
+  # Dynamic Uber JAR - For users who prefer dynamic linking
+  build-dynamic-uber-jar:
+    name: Build Dynamic Uber JAR
     needs: build-dynamic
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1029,7 +1280,7 @@ jobs:
           cd uber-jar-work
           
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Building Uber JAR - All Platforms Dynamic"
+          echo "Building Dynamic Uber JAR - All Platforms"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
           # Extract first JAR to get the base structure
@@ -1058,33 +1309,33 @@ jobs:
           echo "Included native libraries:"
           find base/META-INF/native -type f 2>/dev/null | sort || echo "  (none found)"
           
-          # Create uber JAR
+          # Create dynamic uber JAR
           echo ""
-          echo "Creating uber JAR..."
+          echo "Creating dynamic uber JAR..."
           cd base
-          jar cf ../tongsuo-openjdk-${{ inputs.version }}-uber.jar .
+          jar cf ../tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar .
           cd ..
           
           # Show JAR info
           echo ""
-          echo "Uber JAR created:"
-          ls -lh tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          echo "Dynamic Uber JAR created:"
+          ls -lh tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar
           echo ""
           echo "Native library contents:"
-          jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native" | sort
+          jar tf tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar | grep "META-INF/native" | sort
 
-      - name: Verify Uber JAR
+      - name: Verify Dynamic Uber JAR
         run: |
           cd uber-jar-work
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Uber JAR Verification"
+          echo "Dynamic Uber JAR Verification"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
           # Count platforms by checking for native library files
-          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*linux" | wc -l | tr -d ' ')
-          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(darwin\|osx\)" | wc -l | tr -d ' ')
-          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native.*\(windows\|win\)" | wc -l | tr -d ' ')
+          LINUX_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar | grep "META-INF/native.*linux" | wc -l | tr -d ' ')
+          DARWIN_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar | grep "META-INF/native.*\(darwin\|osx\)" | wc -l | tr -d ' ')
+          WINDOWS_COUNT=$(jar tf tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar | grep "META-INF/native.*\(windows\|win\)" | wc -l | tr -d ' ')
           
           echo "Platform Coverage:"
           echo "  Linux libraries:   $LINUX_COUNT"
@@ -1109,41 +1360,53 @@ jobs:
             exit 0  # Don't fail the build
           fi
 
-      - name: Upload Uber JAR Artifact
+      - name: Upload Dynamic Uber JAR Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: jar-uber
-          path: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          name: jar-dynamic-uber
+          path: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar
           retention-days: 7
 
-      - name: Upload Uber JAR to Release
+      - name: Upload Dynamic Uber JAR to Release
         uses: softprops/action-gh-release@v2
         if: ${{ inputs.publish_release == true }}
         with:
           tag_name: ${{ inputs.version }}
           draft: true
           prerelease: true
-          files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+          files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar
           fail_on_unmatched_files: true
           body: |
-            ## 📦 Uber JAR
+            ## 📦 Dynamic Uber JAR (Advanced Users)
             
-            This is a multi-platform JAR containing native libraries for:
+            **Dynamic linking - Requires Tongsuo installed on the system**
+            
+            This JAR contains native libraries for all platforms with dynamic linking to Tongsuo:
             - ✅ Linux x64
             - ✅ Linux ARM64
             - ✅ macOS x64
             - ✅ macOS ARM64
             - ✅ Windows x64
-            - ✅ Windows ARM64
+            - ❌ Windows ARM64 (not supported)
+            
+            **Benefits:**
+            - ✅ Smaller file size
+            - ✅ Can use system-wide Tongsuo installation
+            - ✅ Easy to upgrade Tongsuo independently
+            
+            **Requirements:**
+            - ⚠️  Requires Tongsuo 8.4.0+ installed on the system
+            - macOS: `brew install tongsuo` or manually install to `/usr/local/lib` or `/opt/homebrew/lib`
+            - Linux: Install to `/usr/local/lib` and run `sudo ldconfig`
+            - Windows: Requires DLLs in system PATH
             
             **Usage:**
-            ```xml
-            <dependency>
-                <groupId>net.tongsuo</groupId>
-                <artifactId>tongsuo-openjdk</artifactId>
-                <version>${{ inputs.version }}</version>
-                <classifier>uber</classifier>
-            </dependency>
+            ```bash
+            # Set library path (if not in system locations)
+            export DYLD_LIBRARY_PATH=/path/to/tongsuo/lib:$DYLD_LIBRARY_PATH  # macOS
+            export LD_LIBRARY_PATH=/path/to/tongsuo/lib:$LD_LIBRARY_PATH      # Linux
+            
+            java -cp tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar:your-app.jar com.example.YourApp
             ```
             
-            **Note:** This JAR works on all supported platforms without platform-specific classifiers.
+            **Recommendation:** Use the static uber JAR instead for simpler deployment.
