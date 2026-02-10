@@ -287,6 +287,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -662,6 +664,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Check
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""

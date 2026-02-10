@@ -289,6 +289,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -300,12 +302,6 @@ jobs:
             GRADLE_ARGS="-Parch=x86_64 -PldFlags=\"-arch x86_64\" -PcFlags=\"-arch x86_64\" -PcppFlags=\"-arch x86_64\""
             # Run Gradle under Rosetta 2 for x86_64 emulation
             GRADLE_CMD="arch -x86_64 ./gradlew"
-          fi
-          
-          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
-          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
-            TASK="assemble"
-            echo "⚠️  Windows ARM64: Building only (tests require ARM64 hardware)"
           fi
           
           # For macOS ARM64, let it build natively (no special flags needed)
@@ -329,7 +325,24 @@ jobs:
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
+      - name: Explain Windows ARM64 Skip (Gradle Assemble)
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Gradle Assemble Skipped for Windows ARM64"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Reason: Gradle Native plugin doesn't support MSVC ARM64"
+          echo "        cross-compilation from x64 host."
+          echo ""
+          echo "Status: Tongsuo C libraries already built in previous step."
+          echo "        Java SDK build will be skipped for this platform."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Gradle Test
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -344,12 +357,6 @@ jobs:
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
           fi
           
-          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
-          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
-            echo "⚠️  Windows ARM64: Skipping tests (already assembled, requires ARM64 hardware)"
-            exit 0
-          fi
-          
           # For macOS ARM64, let it build natively (no special flags needed)
           # The JDK and toolchain will be ARM64 by default on macos-14
 
@@ -370,6 +377,20 @@ jobs:
           
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
+
+      - name: Explain Windows ARM64 Skip (Gradle Test)
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Gradle Test Skipped for Windows ARM64"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Reason: Gradle Native plugin doesn't support MSVC ARM64"
+          echo "        cross-compilation from x64 host."
+          echo ""
+          echo "Status: Tests cannot run on x64 runner for ARM64 binaries."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Verify Windows ARM64 Build
         if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
@@ -448,6 +469,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
+        # Skip Windows ARM64 (no JAR built)
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         uses: actions/upload-artifact@v6
         with:
           name: jar-static-${{ matrix.platform.target }}
@@ -735,6 +758,8 @@ jobs:
           echo "Created Gradle init script to use official repositories"
 
       - name: Gradle Assemble
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -748,12 +773,6 @@ jobs:
             GRADLE_CMD="arch -x86_64 ./gradlew"
             TASK="assemble"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
-          fi
-          
-          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
-          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
-            TASK="assemble"
-            echo "⚠️  Windows ARM64: Building only (tests require ARM64 hardware)"
           fi
           
           # For macOS ARM64, let it build natively (no special flags needed)
@@ -784,7 +803,24 @@ jobs:
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
 
+      - name: Explain Windows ARM64 Skip (Gradle Assemble - Dynamic)
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Gradle Assemble Skipped for Windows ARM64"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Reason: Gradle Native plugin doesn't support MSVC ARM64"
+          echo "        cross-compilation from x64 host."
+          echo ""
+          echo "Status: Tongsuo C libraries already built in previous step."
+          echo "        Java SDK build will be skipped for this platform."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Gradle Test
+        # Skip Windows ARM64 - Gradle Native doesn't support MSVC ARM64 cross-compilation from x64 host
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         shell: bash
         run: |
           GRADLE_ARGS=""
@@ -798,12 +834,6 @@ jobs:
             GRADLE_CMD="arch -x86_64 ./gradlew"
             TASK="test"
             echo "✅ Running tests for macOS x86_64 using Rosetta 2 emulation"
-          fi
-          
-          # Windows ARM64: Build only, skip tests (can't run ARM64 on x64)
-          if [[ "${{ runner.os }}" == "Windows" && "${{ matrix.platform.arch }}" == "arm64" ]]; then
-            echo "⚠️  Windows ARM64: Skipping tests (already assembled, requires ARM64 hardware)"
-            exit 0
           fi
           
           # For macOS ARM64, let it build natively (no special flags needed)
@@ -833,6 +863,20 @@ jobs:
           
           echo "Running Gradle $TASK with args: $GRADLE_ARGS..."
           eval $GRADLE_CMD $TASK -PcheckErrorQueue -PtongsuoDynamic=1 -PtongsuoHome="$TONGSUO_HOME_GRADLE" $GRADLE_ARGS
+
+      - name: Explain Windows ARM64 Skip (Gradle Test - Dynamic)
+        if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
+        shell: bash
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  Gradle Test Skipped for Windows ARM64"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Reason: Gradle Native plugin doesn't support MSVC ARM64"
+          echo "        cross-compilation from x64 host."
+          echo ""
+          echo "Status: Tests cannot run on x64 runner for ARM64 binaries."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       - name: Verify Windows ARM64 Build (Dynamic)
         if: runner.os == 'Windows' && matrix.platform.arch == 'arm64'
@@ -910,6 +954,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Artifact
+        # Skip Windows ARM64 (no JAR built)
+        if: ${{ !(runner.os == 'Windows' && matrix.platform.arch == 'arm64') }}
         uses: actions/upload-artifact@v6
         with:
           name: jar-dynamic-${{ matrix.platform.target }}
@@ -980,11 +1026,12 @@ jobs:
           name: jar-dynamic-VC-WIN64A
           path: uber-jar-work/jars/
 
-      - name: Download Windows ARM64 Dynamic JAR
-        uses: actions/download-artifact@v7
-        with:
-          name: jar-dynamic-VC-WIN64-ARM
-          path: uber-jar-work/jars/
+      # Windows ARM64 JAR not available - Gradle Native doesn't support MSVC ARM64 cross-compilation
+      # - name: Download Windows ARM64 Dynamic JAR
+      #   uses: actions/download-artifact@v7
+      #   with:
+      #     name: jar-dynamic-VC-WIN64-ARM
+      #     path: uber-jar-work/jars/
 
       - name: Extract and Merge Native Libraries
         run: |
