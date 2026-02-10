@@ -412,9 +412,28 @@ model {
                             cppCompiler.define "CONSCRYPT_CHECK_ERROR_QUEUE"
                         }
 
+                        // Add custom compiler flags if provided
+                        if (rootProject.hasProperty('cppFlags')) {
+                            def flags = rootProject.property('cppFlags').toString().split()
+                            cppCompiler.args(flags)
+                            System.out.println("Added C++ compiler flags: ${flags}")
+                        }
+                        if (rootProject.hasProperty('cFlags')) {
+                            def flags = rootProject.property('cFlags').toString().split()
+                            cppCompiler.args(flags)
+                            System.out.println("Added C compiler flags: ${flags}")
+                        }
+
                         linker.args "-O3",
                                 "-fvisibility=hidden",
                                 "-lpthread"
+                        
+                        // Add custom linker flags if provided
+                        if (rootProject.hasProperty('ldFlags')) {
+                            def flags = rootProject.property('ldFlags').toString().split()
+                            linker.args(flags)
+                            System.out.println("Added linker flags: ${flags}")
+                        }
 
                         if (tongsuoDynamic == "1" || tongsuoDynamic == "true") {
                             linker.args "-L" + libPath,
