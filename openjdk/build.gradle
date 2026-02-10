@@ -604,7 +604,6 @@ model {
                     
                     doFirst {
                         def libFile = binary.tasks.link.linkedFile.asFile.get()
-                        def tongsuoHome = System.getenv('TONGSUO_HOME')
                         
                         if (tongsuoHome) {
                             // Change absolute paths to @rpath
