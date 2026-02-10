@@ -1138,21 +1138,24 @@ jobs:
           cd uber-jar-work/base
           
           # Create new MANIFEST.MF with all metadata
-          cat > META-INF/MANIFEST.MF << EOF
+          cat > META-INF/MANIFEST.MF << 'EOF'
 Manifest-Version: 1.0
-Created-By: ${{ inputs.version }} (Tongsuo Project)
+Created-By: Tongsuo Project
 Implementation-Title: Tongsuo Java SDK (Static Uber JAR)
 Implementation-Version: ${{ inputs.version }}
 Implementation-Vendor: Tongsuo Project
-Build-Time: ${BUILD_TIME}
-Git-Commit: ${GIT_COMMIT}
-Git-Branch: ${GIT_BRANCH}
-Build-Jdk: ${{ matrix.java-version || '11.0.30' }} (Eclipse Adoptium)
 Automatic-Module-Name: org.conscrypt
 Bundle-SymbolicName: org.conscrypt
 Jar-Type: uber-static
 Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64
-
+EOF
+          
+          # Add dynamic fields
+          cat >> META-INF/MANIFEST.MF << EOF
+Build-Time: ${BUILD_TIME}
+Git-Commit: ${GIT_COMMIT}
+Git-Branch: ${GIT_BRANCH}
+Build-Jdk: 11.0.30 (Eclipse Adoptium)
 EOF
           
           echo "MANIFEST.MF created with:"
@@ -1357,21 +1360,24 @@ EOF
           cd uber-jar-work/base
           
           # Create new MANIFEST.MF with all metadata
-          cat > META-INF/MANIFEST.MF << EOF
+          cat > META-INF/MANIFEST.MF << 'EOF'
 Manifest-Version: 1.0
-Created-By: ${{ inputs.version }} (Tongsuo Project)
+Created-By: Tongsuo Project
 Implementation-Title: Tongsuo Java SDK (Dynamic Uber JAR)
 Implementation-Version: ${{ inputs.version }}
 Implementation-Vendor: Tongsuo Project
-Build-Time: ${BUILD_TIME}
-Git-Commit: ${GIT_COMMIT}
-Git-Branch: ${GIT_BRANCH}
-Build-Jdk: ${{ matrix.java-version || '11.0.30' }} (Eclipse Adoptium)
 Automatic-Module-Name: org.conscrypt
 Bundle-SymbolicName: org.conscrypt
 Jar-Type: uber-dynamic
 Platforms: linux-x86_64,linux-aarch64,darwin-x86_64,darwin-aarch64,windows-x86_64
-
+EOF
+          
+          # Add dynamic fields
+          cat >> META-INF/MANIFEST.MF << EOF
+Build-Time: ${BUILD_TIME}
+Git-Commit: ${GIT_COMMIT}
+Git-Branch: ${GIT_BRANCH}
+Build-Jdk: 11.0.30 (Eclipse Adoptium)
 EOF
           
           echo "MANIFEST.MF created with:"
