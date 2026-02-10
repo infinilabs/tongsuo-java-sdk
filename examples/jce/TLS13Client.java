@@ -29,7 +29,7 @@ import net.tongsuo.TongsuoX509Certificate;
 public class TLS13Client {
     public static void main(String[] args)throws Exception{
         String ip = "127.0.0.1";
-        int port = 443;
+        int port = 8443;
         String ciperSuites = "TLS_SM4_GCM_SM3:TLS_SM4_CCM_SM3";
         String caCert = "chain.crt";
 
@@ -79,28 +79,55 @@ public class TLS13Client {
         }
 
         BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sslSocket.getOutputStream()));
+        System.out.println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        System.out.println("Sending HTTP request to server...");
+        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         out.write("GET / HTTP/1.0\r\n\r\n");
         out.flush();
 
-        System.out.println("client ssl send msessage success...");
+        System.out.println("Request sent successfully");
 
         BufferedInputStream streamReader = new BufferedInputStream(sslSocket.getInputStream());
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(streamReader, "utf-8"));
+        
+        System.out.println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        System.out.println("Response from server:");
+        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
         String line = null;
+        int lineCount = 0;
         while((line = bufferedReader.readLine())!= null){
-            System.out.println("client receive server data:" + line);
+            System.out.println(line);
+            lineCount++;
+        }
+        
+        if (lineCount == 0) {
+            System.out.println("⚠️  No data received from server!");
+        } else {
+            System.out.println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("✅ Successfully received " + lineCount + " lines from server");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         }
 
-        while (true) {
-            try {
-                sslSocket.sendUrgentData(0xFF);
-                Thread.sleep(1000L);
-                System.out.println("client waiting server close");
-            } catch (Exception e) {
-                bufferedReader.close();
-                out.close();
-                sslSocket.close();
-            }
+        // Close resources in correct order: writers first, then readers, then socket
+        try {
+            out.close();
+        } catch (Exception e) {
+            // Ignore close errors
         }
+        
+        try {
+            bufferedReader.close();
+        } catch (Exception e) {
+            // Ignore close errors
+        }
+        
+        try {
+            sslSocket.close();
+        } catch (Exception e) {
+            // Ignore close errors
+        }
+        
+        System.out.println("\nConnection closed");
     }
 }
