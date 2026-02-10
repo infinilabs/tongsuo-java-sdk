@@ -599,44 +599,44 @@ model {
             // Only fix if we have Tongsuo shared libraries (dynamic build)
             if (osdetector.os == 'osx' && hasTongsuoSharedLibs) {
                 def fixRpathTask = binary.tasks.taskName("fixRpath")
-                project.tasks.register(fixRpathTask as String, Exec) {
+                project.tasks.register(fixRpathTask as String) {
                     dependsOn binary.tasks.link
                     
-                    doFirst {
+                    doLast {
                         def libFile = binary.tasks.link.linkedFile.asFile.get()
                         
                         if (tongsuoHome) {
                             // Change absolute paths to @rpath
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-change", "${tongsuoHome}/lib/libssl.3.dylib", "@rpath/libssl.3.dylib", libFile
                                 ignoreExitValue = true
                             }
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-change", "${tongsuoHome}/lib/libcrypto.3.dylib", "@rpath/libcrypto.3.dylib", libFile
                                 ignoreExitValue = true
                             }
                             
                             // Add @loader_path as rpath
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-add_rpath", "@loader_path", libFile
                                 ignoreExitValue = true
                             }
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-add_rpath", "@loader_path/.", libFile
                                 ignoreExitValue = true
                             }
                             
                             // Add system library paths
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-add_rpath", "/usr/local/lib", libFile
                                 ignoreExitValue = true
                             }
-                            exec {
+                            project.exec {
                                 executable "install_name_tool"
                                 args "-add_rpath", "/opt/homebrew/lib", libFile
                                 ignoreExitValue = true
@@ -653,21 +653,21 @@ model {
             // Only fix if we have Tongsuo shared libraries (dynamic build)
             if (osdetector.os == 'linux' && hasTongsuoSharedLibs) {
                 def fixRpathTask = binary.tasks.taskName("fixRpath")
-                project.tasks.register(fixRpathTask as String, Exec) {
+                project.tasks.register(fixRpathTask as String) {
                     dependsOn binary.tasks.link
                     
-                    doFirst {
+                    doLast {
                         def libFile = binary.tasks.link.linkedFile.asFile.get()
                         
                         // Check if patchelf is available
                         try {
-                            exec {
+                            project.exec {
                                 executable "which"
                                 args "patchelf"
                             }
                             
                             // Set rpath to search in common locations
-                            exec {
+                            project.exec {
                                 executable "patchelf"
                                 args "--set-rpath", '$ORIGIN:/usr/local/lib:/usr/lib:/lib', libFile
                                 ignoreExitValue = true
