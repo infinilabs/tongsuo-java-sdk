@@ -536,31 +536,45 @@ model {
             }
             
             // For dynamic builds, also copy Tongsuo shared libraries
-            if (nativeBuild.buildType == BuildType.DYNAMIC) {
+            // Check if Tongsuo shared libraries exist (indicates dynamic build)
+            def tongsuoHome = System.getenv('TONGSUO_HOME')
+            def hasTongsuoSharedLibs = false
+            
+            if (tongsuoHome && new File(tongsuoHome).exists()) {
+                def tongsuoLibDir = new File(tongsuoHome, 'lib')
+                if (tongsuoLibDir.exists()) {
+                    // Check for shared library files
+                    if (osdetector.os == 'osx') {
+                        hasTongsuoSharedLibs = tongsuoLibDir.listFiles()?.any { it.name.matches('libssl.*\\.dylib') }
+                    } else if (osdetector.os == 'linux') {
+                        hasTongsuoSharedLibs = tongsuoLibDir.listFiles()?.any { it.name.matches('libssl\\.so.*') }
+                    } else if (osdetector.os == 'windows') {
+                        def tongsyoBinDir = new File(tongsuoHome, 'bin')
+                        hasTongsuoSharedLibs = tongsyoBinDir.exists() && tongsyoBinDir.listFiles()?.any { it.name.matches('libssl-.*\\.dll') }
+                    }
+                }
+            }
+            
+            if (hasTongsuoSharedLibs) {
                 def copyTongsuoLibsTask = project.tasks.register("copyTongsuoLibs${classifier}", Copy) {
                     dependsOn binary.tasks.link
                     
-                    def tongsuoHome = System.getenv('TONGSUO_HOME')
-                    if (tongsuoHome && new File(tongsuoHome).exists()) {
-                        def tongsuoLibDir = new File(tongsuoHome, 'lib')
-                        if (tongsuoLibDir.exists()) {
-                            from tongsuoLibDir
-                            into nativeBuild.jarNativeResourcesDir()
-                            
-                            // Platform-specific library patterns
-                            if (osdetector.os == 'osx') {
-                                include 'libssl*.dylib', 'libcrypto*.dylib'
-                            } else if (osdetector.os == 'linux') {
-                                include 'libssl.so*', 'libcrypto.so*'
-                            } else if (osdetector.os == 'windows') {
-                                from new File(tongsuoHome, 'bin')  // Windows DLLs are in bin/
-                                include 'libssl-*.dll', 'libcrypto-*.dll'
-                            }
-                            
-                            // Preserve symlinks and copy actual files
-                            duplicatesStrategy = DuplicatesStrategy.INCLUDE
-                        }
+                    def tongsuoLibDir = new File(tongsuoHome, 'lib')
+                    from tongsuoLibDir
+                    into nativeBuild.jarNativeResourcesDir()
+                    
+                    // Platform-specific library patterns
+                    if (osdetector.os == 'osx') {
+                        include 'libssl*.dylib', 'libcrypto*.dylib'
+                    } else if (osdetector.os == 'linux') {
+                        include 'libssl.so*', 'libcrypto.so*'
+                    } else if (osdetector.os == 'windows') {
+                        from new File(tongsuoHome, 'bin')  // Windows DLLs are in bin/
+                        include 'libssl-*.dll', 'libcrypto-*.dll'
                     }
+                    
+                    // Preserve symlinks and copy actual files
+                    duplicatesStrategy = DuplicatesStrategy.INCLUDE
                 }
                 
                 processResources {
@@ -582,7 +596,8 @@ model {
             }
 
             // Fix dynamic library paths (rpath) for macOS
-            if (osdetector.os == 'osx' && nativeBuild.buildType == BuildType.DYNAMIC) {
+            // Only fix if we have Tongsuo shared libraries (dynamic build)
+            if (osdetector.os == 'osx' && hasTongsuoSharedLibs) {
                 def fixRpathTask = binary.tasks.taskName("fixRpath")
                 project.tasks.register(fixRpathTask as String, Exec) {
                     dependsOn binary.tasks.link
@@ -636,7 +651,8 @@ model {
             }
             
             // Fix dynamic library paths (rpath) for Linux
-            if (osdetector.os == 'linux' && nativeBuild.buildType == BuildType.DYNAMIC) {
+            // Only fix if we have Tongsuo shared libraries (dynamic build)
+            if (osdetector.os == 'linux' && hasTongsuoSharedLibs) {
                 def fixRpathTask = binary.tasks.taskName("fixRpath")
                 project.tasks.register(fixRpathTask as String, Exec) {
                     dependsOn binary.tasks.link
