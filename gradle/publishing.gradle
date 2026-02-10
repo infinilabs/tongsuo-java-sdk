@@ -12,12 +12,13 @@ publishing {
                     description = project.description
                 }
 
-                url = 'https://github.com/infinilabs/tongsuo-java-sdk'
+                url = project.findProperty('mavenProjectUrl') ?: 'https://www.tongsuo.net/'
 
                 scm {
-                    connection = 'scm:git:https://github.com/infinilabs/tongsuo-java-sdk.git'
-                    developerConnection = 'scm:git:git@github.com:infinilabs/tongsuo-java-sdk.git'
-                    url = 'https://github.com/infinilabs/tongsuo-java-sdk'
+                    def scmUrl = project.findProperty('mavenScmUrl') ?: 'https://github.com/Tongsuo-Project/tongsuo-java-sdk'
+                    connection = "scm:git:${scmUrl}.git"
+                    developerConnection = "scm:git:git@github.com:${scmUrl.replaceFirst('https://github.com/', '')}.git"
+                    url = scmUrl
                 }
 
                 licenses {
@@ -29,12 +30,12 @@ publishing {
 
                 developers {
                     developer {
-                        id = 'infinilabs'
-                        name = 'INFINI Labs'
-                        email = 'hello@infini.ltd'
-                        url = 'https://www.infini.ltd/'
-                        organization = 'INFINI Labs'
-                        organizationUrl = 'https://github.com/infinilabs'
+                        id = project.findProperty('mavenDeveloperId') ?: 'tongsuo'
+                        name = project.findProperty('mavenDeveloperName') ?: 'Tongsuo Project Authors'
+                        email = project.findProperty('mavenDeveloperEmail') ?: 'tongsuo-dev@tongsuo.net'
+                        url = project.findProperty('mavenDeveloperUrl') ?: 'https://www.tongsuo.net/'
+                        organization = project.findProperty('mavenOrganization') ?: 'Tongsuo Project'
+                        organizationUrl = project.findProperty('mavenOrganizationUrl') ?: 'https://github.com/Tongsuo-Project'
                     }
                 }
             }

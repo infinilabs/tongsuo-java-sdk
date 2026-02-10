@@ -31,3 +31,4 @@ vogar-results/*
 
 # java
 *.class
+gradle.properties
