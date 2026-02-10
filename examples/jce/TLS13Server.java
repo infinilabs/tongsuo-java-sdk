@@ -66,7 +66,7 @@ public class TLS13Server {
          System.out.println("Server SSL context init success...");
 
         SSLServerSocketFactory socketFactory = sslContext.getServerSocketFactory();
-        SSLServerSocket serverSocket = (SSLServerSocket)socketFactory.createServerSocket(443);
+        SSLServerSocket serverSocket = (SSLServerSocket)socketFactory.createServerSocket(8443);
 
         if(ciperSuites != null && !"".equals(ciperSuites.trim())){
             String[] ciperSuiteArray = ciperSuites.split(":");
@@ -79,24 +79,54 @@ public class TLS13Server {
 
         while (true){
             SSLSocket sslSocket = (SSLSocket)serverSocket.accept();
+            System.out.println("Client connected from: " + sslSocket.getInetAddress());
 
             try {
                 BufferedReader in = new BufferedReader( new InputStreamReader(sslSocket.getInputStream()) );
                 BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sslSocket.getOutputStream()));
-                String msg = null;
-                char[] cbuf = new char[1024];
-                int len = 0;
-                while((len = in.read(cbuf, 0, 1024)) != -1 ){
-                    msg = new String(cbuf, 0, len);
-                    out.write(msg);
-                    out.flush();
-
-                    if("Bye".equals(msg)) {
-                         break;
+                
+                // Read the HTTP request
+                String requestLine = null;
+                StringBuilder request = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    if (requestLine == null) {
+                        requestLine = line;
                     }
-                    System.out.printf("Received Message --> %s \n", msg);
+                    request.append(line).append("\n");
+                    // HTTP request ends with an empty line
+                    if (line.isEmpty()) {
+                        break;
+                    }
                 }
+                
+                System.out.println("Received request:");
+                System.out.println(request.toString());
+                
+                // Send HTTP response
+                String response = "HTTP/1.0 200 OK\r\n" +
+                                "Content-Type: text/html; charset=UTF-8\r\n" +
+                                "Content-Length: 116\r\n" +
+                                "Connection: close\r\n" +
+                                "\r\n" +
+                                "<html>\n" +
+                                "<head><title>Tongsuo TLS 1.3 Server</title></head>\n" +
+                                "<body>\n" +
+                                "<h1>Hello from Tongsuo!</h1>\n" +
+                                "<p>TLS 1.3 with SM cipher suites is working! 🎉</p>\n" +
+                                "</body>\n" +
+                                "</html>\n";
+                
+                out.write(response);
+                out.flush();
+                System.out.println("Response sent successfully");
+                
+                // Close the connection
+                sslSocket.close();
+                System.out.println("Connection closed\n");
+                
             } catch (IOException e){
+                 System.err.println("Error handling client connection:");
                  e.printStackTrace();
             }
         }
