@@ -77,9 +77,7 @@ subprojects {
     apply plugin: "jacoco"
     apply plugin: "net.ltgt.errorprone"
 
-    // Allow overriding group ID via gradle.properties or command line
-    // e.g., -PmavenGroupId=com.infinilabs
-    group = project.findProperty('mavenGroupId') ?: "net.tongsuo"
+    group = "net.tongsuo"
     description = 'Tongsuo Provider is an alternate Java Security Provider that uses Tongsuo'
     version = "1.1.0"
 
