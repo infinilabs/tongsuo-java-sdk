@@ -94,6 +94,12 @@ public abstract class OpenSSLBaseDHKeyAgreement<T> extends KeyAgreementSpi {
     /**
      * Given the public key {@code theirPublicKey} and the private key {@code ourPrivateKey} write the shared secret
      * to {@code buffer} and return the actual output size.
+     * 
+     * @param buffer the buffer to write the shared secret to
+     * @param theirPublicKey the peer's public key
+     * @param ourPrivateKey our private key
+     * @return the actual size of the shared secret written to the buffer
+     * @throws InvalidKeyException if the key is invalid
      */
     protected abstract int computeKey(byte[] buffer, T theirPublicKey, T ourPrivateKey) throws InvalidKeyException;
 
@@ -137,7 +143,12 @@ public abstract class OpenSSLBaseDHKeyAgreement<T> extends KeyAgreementSpi {
         mPrivateKey = privateKey;
     }
 
-    /** Returns the expected result length for the given {@code key}. */
+    /**
+     * Returns the expected result length for the given {@code key}.
+     * 
+     * @param key the private key
+     * @return the expected output size in bytes
+     */
     protected abstract int getOutputSize(T key);
 
     @Override

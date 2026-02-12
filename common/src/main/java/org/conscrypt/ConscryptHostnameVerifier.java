@@ -29,6 +29,11 @@ public interface ConscryptHostnameVerifier {
   /**
    * Returns whether the given hostname is allowable given the peer's authentication information
    * from the given session.
+   * 
+   * @param certs the peer's certificate chain
+   * @param hostname the hostname being verified
+   * @param session the SSL session
+   * @return true if the hostname is allowed
    */
   boolean verify(X509Certificate[] certs, String hostname, SSLSession session);
 

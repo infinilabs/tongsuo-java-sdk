@@ -26,6 +26,8 @@ public abstract class HandshakeListener {
 
     /**
      * Called by the engine when the TLS handshake has completed.
+     * 
+     * @throws SSLException if an error occurs during handshake processing
      */
     public abstract void onHandshakeFinished() throws SSLException;
 }

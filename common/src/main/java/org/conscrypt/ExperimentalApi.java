@@ -46,6 +46,8 @@ import java.lang.annotation.Target;
 public @interface ExperimentalApi {
     /**
      * Context information such as links to discussion thread, tracking issue etc.
+     * 
+     * @return context information string
      */
     String value() default "";
 }
