@@ -1225,27 +1225,68 @@ jobs:
           files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-uber.jar
           fail_on_unmatched_files: true
           body: |
-            ## 📦 Static Uber JAR (Recommended)
+            ## 📦 Tongsuo Java SDK - Static Uber JAR (Recommended) ⭐
             
-            **Static linking - No external dependencies required!**
+            ### What's This?
             
-            This JAR contains native libraries for all platforms with Tongsuo statically linked:
-            - ✅ Linux x64
-            - ✅ Linux ARM64
-            - ✅ macOS x64
-            - ✅ macOS ARM64
-            - ✅ Windows x64
-            - ❌ Windows ARM64 (not supported due to Gradle Native limitations)
+            A **self-contained** JAR with Tongsuo statically linked - no installation required!
             
-            **Benefits:**
-            - ✅ No need to install Tongsuo separately
-            - ✅ Works out of the box
-            - ✅ Larger file size but simpler deployment
+            ### ✨ Features
             
-            **Usage:**
+            - **All-in-one**: Native libraries for 5 platforms in one JAR
+            - **Zero dependencies**: Works immediately after download
+            - **Enhanced MANIFEST**: Includes Git commit, build time, and version info
+            - **Optimized rpath**: Proper library loading on all platforms
+            
+            ### 🖥️ Platform Support
+            
+            | Platform | Architecture | Status |
+            |----------|-------------|--------|
+            | Linux | x86_64 | ✅ Supported |
+            | Linux | ARM64 | ✅ Supported |
+            | macOS | x86_64 | ✅ Supported |
+            | macOS | ARM64 (Apple Silicon) | ✅ Supported |
+            | Windows | x86_64 | ✅ Supported |
+            | Windows | ARM64 | ❌ Not supported |
+            
+            ### 📥 Quick Start
+            
             ```bash
+            # Download
+            wget https://github.com/Tongsuo-Project/tongsuo-java-sdk/releases/download/${{ inputs.version }}/tongsuo-openjdk-${{ inputs.version }}-uber.jar
+            
+            # Use in your project
             java -cp tongsuo-openjdk-${{ inputs.version }}-uber.jar:your-app.jar com.example.YourApp
+            
+            # Or with Maven/Gradle
+            <dependency>
+              <groupId>net.tongsuo</groupId>
+              <artifactId>tongsuo-openjdk</artifactId>
+              <version>${{ inputs.version }}</version>
+              <classifier>uber</classifier>
+            </dependency>
             ```
+            
+            ### 🔍 Verify Your Download
+            
+            ```bash
+            # Check MANIFEST
+            unzip -p tongsuo-openjdk-${{ inputs.version }}-uber.jar META-INF/MANIFEST.MF
+            
+            # List native libraries
+            jar tf tongsuo-openjdk-${{ inputs.version }}-uber.jar | grep "META-INF/native"
+            ```
+            
+            ### 💡 When to Use
+            
+            - ✅ You want **simplicity** and don't want to install system libraries
+            - ✅ You need a **portable** solution that works everywhere
+            - ✅ You're deploying to **containers** or cloud environments
+            - ✅ File size (~15-20MB) is acceptable for your use case
+            
+            ### 📚 Documentation
+            
+            See [examples/jce/README.md](https://github.com/Tongsuo-Project/tongsuo-java-sdk/tree/multiplatform/examples/jce) for complete usage examples.
 
   # Dynamic Uber JAR - For users who prefer dynamic linking
   build-dynamic-uber-jar:
@@ -1441,36 +1482,84 @@ jobs:
           files: uber-jar-work/tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar
           fail_on_unmatched_files: true
           body: |
-            ## 📦 Dynamic Uber JAR (Advanced Users)
+            ## 📦 Tongsuo Java SDK - Dynamic Uber JAR (Advanced Users)
             
-            **Dynamic linking - Requires Tongsuo installed on the system**
+            ### What's This?
             
-            This JAR contains native libraries for all platforms with dynamic linking to Tongsuo:
-            - ✅ Linux x64
-            - ✅ Linux ARM64
-            - ✅ macOS x64
-            - ✅ macOS ARM64
-            - ✅ Windows x64
-            - ❌ Windows ARM64 (not supported)
+            A **lightweight** JAR with dynamic linking - requires system Tongsuo installation.
             
-            **Benefits:**
-            - ✅ Smaller file size
-            - ✅ Can use system-wide Tongsuo installation
-            - ✅ Easy to upgrade Tongsuo independently
+            ### ✨ Features
             
-            **Requirements:**
-            - ⚠️  Requires Tongsuo 8.4.0+ installed on the system
-            - macOS: `brew install tongsuo` or manually install to `/usr/local/lib` or `/opt/homebrew/lib`
-            - Linux: Install to `/usr/local/lib` and run `sudo ldconfig`
-            - Windows: Requires DLLs in system PATH
+            - **Compact size**: Only ~1-2MB (vs 15-20MB for static)
+            - **System integration**: Uses your system's Tongsuo installation
+            - **Enhanced MANIFEST**: Includes Git commit, build time, and version info
+            - **Optimized rpath**: Libraries configured to find system Tongsuo
             
-            **Usage:**
+            ### 🖥️ Platform Support
+            
+            | Platform | Architecture | Status |
+            |----------|-------------|--------|
+            | Linux | x86_64 | ✅ Supported |
+            | Linux | ARM64 | ✅ Supported |
+            | macOS | x86_64 | ✅ Supported |
+            | macOS | ARM64 (Apple Silicon) | ✅ Supported |
+            | Windows | x86_64 | ✅ Supported |
+            | Windows | ARM64 | ❌ Not supported |
+            
+            ### ⚙️ Installation Requirements
+            
+            **You must install Tongsuo 8.4.0+ on your system first:**
+            
             ```bash
-            # Set library path (if not in system locations)
-            export DYLD_LIBRARY_PATH=/path/to/tongsuo/lib:$DYLD_LIBRARY_PATH  # macOS
-            export LD_LIBRARY_PATH=/path/to/tongsuo/lib:$LD_LIBRARY_PATH      # Linux
+            # macOS
+            brew install tongsuo
             
-            java -cp tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar:your-app.jar com.example.YourApp
+            # Linux (from source)
+            git clone https://github.com/Tongsuo-Project/Tongsuo.git
+            cd Tongsuo
+            ./config --prefix=/usr/local
+            make && sudo make install
+            sudo ldconfig
+            
+            # Windows
+            # Download binaries and add to PATH
             ```
             
-            **Recommendation:** Use the static uber JAR instead for simpler deployment.
+            ### 📥 Quick Start
+            
+            ```bash
+            # 1. Install Tongsuo first (see above)
+            
+            # 2. Download JAR
+            wget https://github.com/Tongsuo-Project/tongsuo-java-sdk/releases/download/${{ inputs.version }}/tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar
+            
+            # 3. Use it
+            java -cp tongsuo-openjdk-${{ inputs.version }}-dynamic-uber.jar:your-app.jar com.example.YourApp
+            
+            # If Tongsuo is not in standard location, set library path:
+            # macOS:
+            export DYLD_LIBRARY_PATH=/path/to/tongsuo/lib:$DYLD_LIBRARY_PATH
+            # Linux:
+            export LD_LIBRARY_PATH=/path/to/tongsuo/lib:$LD_LIBRARY_PATH
+            ```
+            
+            ### 💡 When to Use
+            
+            - ✅ You already have Tongsuo installed system-wide
+            - ✅ You want **minimal JAR size** for faster downloads/deployments
+            - ✅ You need to use a **specific Tongsuo version** or custom build
+            - ✅ You're comfortable managing system dependencies
+            
+            ### ⚠️ Troubleshooting
+            
+            **Error: `UnsatisfiedLinkError: libssl.3.dylib`**
+            - **Cause**: Tongsuo not installed or not in library path
+            - **Fix**: Install Tongsuo or use the static uber JAR instead
+            
+            ### 🔄 Recommendation
+            
+            **For most users, we recommend the static uber JAR** (`tongsuo-openjdk-${{ inputs.version }}-uber.jar`) which requires no system setup.
+            
+            ### 📚 Documentation
+            
+            See [examples/jce/README.md](https://github.com/Tongsuo-Project/tongsuo-java-sdk/tree/multiplatform/examples/jce) for complete usage examples.
