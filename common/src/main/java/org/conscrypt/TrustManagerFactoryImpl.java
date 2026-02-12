@@ -65,7 +65,7 @@ public class TrustManagerFactoryImpl extends TrustManagerFactorySpi {
     }
 
     /**
-     * @see javax.net.ssl#engineInit(ManagerFactoryParameters)
+     * @see javax.net.ssl.TrustManagerFactorySpi#engineInit(ManagerFactoryParameters)
      */
     @Override
     public void engineInit(ManagerFactoryParameters spec)
@@ -75,7 +75,7 @@ public class TrustManagerFactoryImpl extends TrustManagerFactorySpi {
     }
 
     /**
-     * @see javax.net.ssl#engineGetTrustManagers()
+     * @see javax.net.ssl.TrustManagerFactorySpi#engineGetTrustManagers()
      */
     @Override
     public TrustManager[] engineGetTrustManagers() {
