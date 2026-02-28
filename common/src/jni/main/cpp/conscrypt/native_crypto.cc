@@ -986,8 +986,26 @@ static jlong NativeCrypto_EVP_parse_private_key(JNIEnv* env, jclass, jbyteArray 
         return 0;
     }
 
-    const unsigned char *p = reinterpret_cast<const unsigned char *>(bytes.get());
-    UniquePtr<EVP_PKEY> pkey(d2i_AutoPrivateKey(NULL, &p, bytes.size()));
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(bytes.get());
+
+    // Step 1: Use PKCS#8 First (BEGIN PRIVATE KEY)
+    {
+        const unsigned char* tmp = p;
+        UniquePtr<PKCS8_PRIV_KEY_INFO> p8(d2i_PKCS8_PRIV_KEY_INFO(nullptr, &tmp, bytes.size()));
+        if (p8.get() != nullptr) {
+            UniquePtr<EVP_PKEY> pkey(EVP_PKCS82PKEY(p8.get()));
+            if (pkey.get() != nullptr) {
+                ERR_clear_error(); 
+                JNI_TRACE("bytes=%p EVP_parse_private_key (PKCS8) => %p", keyJavaBytes, pkey.get());
+                return reinterpret_cast<uintptr_t>(pkey.release());
+            }
+        }
+        ERR_clear_error(); // PKCS#8 path failed, clear errors before fallback
+    }
+
+    // Step 2: fallback to legacy format (BEGIN EC PRIVATE KEY / BEGIN RSA PRIVATE KEY)
+    p = reinterpret_cast<const unsigned char*>(bytes.get());
+    UniquePtr<EVP_PKEY> pkey(d2i_AutoPrivateKey(nullptr, &p, bytes.size()));
     if (pkey.get() == nullptr) {
         conscrypt::jniutil::throwParsingException(env, "Error parsing private key");
         ERR_clear_error();
