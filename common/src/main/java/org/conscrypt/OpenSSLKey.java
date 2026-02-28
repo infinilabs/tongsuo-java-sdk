@@ -203,7 +203,7 @@ final class OpenSSLKey {
         try {
             return new OpenSSLKey(NativeCrypto.EVP_parse_private_key(encoded));
         } catch (ParsingException e) {
-            throw new InvalidKeyException(e);
+            return null; // Continue to fallback to wrapping the key for TLS/SSL stack only.
         }
     }
 
@@ -213,14 +213,39 @@ final class OpenSSLKey {
      * provider which accepts the key.
      */
     private static OpenSSLKey wrapJCAPrivateKeyForTLSStackOnly(PrivateKey privateKey,
-            PublicKey publicKey) throws InvalidKeyException {
+        PublicKey publicKey) throws InvalidKeyException {
         String keyAlgorithm = privateKey.getAlgorithm();
         if ("RSA".equals(keyAlgorithm)) {
             return OpenSSLRSAPrivateKey.wrapJCAPrivateKeyForTLSStackOnly(privateKey, publicKey);
         } else if ("EC".equals(keyAlgorithm)) {
+            // Try parsing as SM2 first (SM2's algorithm is also "EC")
+            if (privateKey.getFormat() != null && privateKey.getEncoded() != null) {
+                try {
+                    // Try using the EVP_parse_private_key path (we have fixed support for PKCS#8)
+                    return new OpenSSLKey(NativeCrypto.EVP_parse_private_key(privateKey.getEncoded()));
+                } catch (Exception e) {
+                    // NOT an SM2 key, fallback to EC path
+                }
+            }
             return OpenSSLECPrivateKey.wrapJCAPrivateKeyForTLSStackOnly(privateKey, publicKey);
         } else {
             throw new InvalidKeyException("Unsupported key algorithm: " + keyAlgorithm);
+        }
+    }
+
+    /**
+     * Parse a PKCS#8 encoded private key (including SM2) directly into an OpenSSLKey.
+     * This is the recommended way to load SM2 private keys for use with Tongsuo/conscrypt.
+     */
+    public static OpenSSLKey fromPkcs8EncodedPrivateKey(byte[] pkcs8Encoded)
+            throws InvalidKeyException {
+        if (pkcs8Encoded == null) {
+            throw new InvalidKeyException("Encoded key is null");
+        }
+        try {
+            return new OpenSSLKey(NativeCrypto.EVP_parse_private_key(pkcs8Encoded));
+        } catch (ParsingException e) {
+            throw new InvalidKeyException("Failed to parse PKCS#8 private key", e);
         }
     }
 
